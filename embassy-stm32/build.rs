@@ -2193,14 +2193,14 @@ fn main() {
         (("mdf", "FLT5"), quote!(crate::mdf::RxDma<Flt5>)),
         (("xspi", "RX"), quote!(crate::xspi::XDma)),
         (("xspi", "RX"), quote!(crate::xspi::XDma)),
-        (("dfsdm", "FLT0"), quote!(crate::dfsdm::Dma<Flt0>)),
-        (("dfsdm", "FLT1"), quote!(crate::dfsdm::Dma<Flt1>)),
-        (("dfsdm", "FLT2"), quote!(crate::dfsdm::Dma<Flt2>)),
-        (("dfsdm", "FLT3"), quote!(crate::dfsdm::Dma<Flt3>)),
-        (("dfsdm", "FLT4"), quote!(crate::dfsdm::Dma<Flt4>)),
-        (("dfsdm", "FLT5"), quote!(crate::dfsdm::Dma<Flt5>)),
-        (("dfsdm", "FLT6"), quote!(crate::dfsdm::Dma<Flt6>)),
-        (("dfsdm", "FLT7"), quote!(crate::dfsdm::Dma<Flt7>)),
+        // (("dfsdm", "FLT0"), quote!(crate::dfsdm::Dma<Flt0>)),
+        // (("dfsdm", "FLT1"), quote!(crate::dfsdm::Dma<Flt1>)),
+        // (("dfsdm", "FLT2"), quote!(crate::dfsdm::Dma<Flt2>)),
+        // (("dfsdm", "FLT3"), quote!(crate::dfsdm::Dma<Flt3>)),
+        // (("dfsdm", "FLT4"), quote!(crate::dfsdm::Dma<Flt4>)),
+        // (("dfsdm", "FLT5"), quote!(crate::dfsdm::Dma<Flt5>)),
+        // (("dfsdm", "FLT6"), quote!(crate::dfsdm::Dma<Flt6>)),
+        // (("dfsdm", "FLT7"), quote!(crate::dfsdm::Dma<Flt7>)),
     ]
     .into();
 

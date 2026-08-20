@@ -101,45 +101,46 @@ where
     T: Instance,
 {
     /// Generic new
-    pub fn new<D, M>(
+    pub fn new(
+        //<D, M>(
         peri: Peri<'d, T>,
-        dma: Peri<'d, D>,
+        // dma: Peri<'d, D>,
         _irq: impl interrupt::typelevel::Binding<T::Interrupt, InterruptHandler<T>>
-        + interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>>
+        // + interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>>
         + 'd,
         d0: Peri<'d, impl Ckin0Pin<T>>,
         config: Config,
     ) -> Self
-    where
-        D: Dma<T, M>,
-        M: FilterChannel,
+// where
+    //     D: Dma<T, M>,
+    //     M: FilterChannel,
     {
         config_pins!(d0);
 
-        Self::new_inner(peri, dma, _irq, config, false, 0b00)
+        Self { inner: peri } //Self::new_inner(peri, dma, _irq, config, false, 0b00)
     }
 
-    fn new_inner<D, M>(
-        peri: Peri<'d, T>,
-        dma: Peri<'d, D>,
-        irq: impl interrupt::typelevel::Binding<T::Interrupt, InterruptHandler<T>>
-        + interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>>
-        + 'd,
-        config: Config,
-        use_embedded_synchronization: bool,
-        edm: u8,
-    ) -> Self
-    where
-        D: Dma<T, M>,
-        M: FilterChannel,
-    {
-        rcc::enable_and_reset::<T>();
-        //TODO configure and enable
-        T::Interrupt::unpend();
-        unsafe { T::Interrupt::enable() };
+    // fn new_inner<D, M>(
+    //     peri: Peri<'d, T>,
+    //     dma: Peri<'d, D>,
+    //     irq: impl interrupt::typelevel::Binding<T::Interrupt, InterruptHandler<T>>
+    //     + interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>>
+    //     + 'd,
+    //     config: Config,
+    //     use_embedded_synchronization: bool,
+    //     edm: u8,
+    // ) -> Self
+    // where
+    //     D: Dma<T, M>,
+    //     M: FilterChannel,
+    // {
+    //     rcc::enable_and_reset::<T>();
+    //     //TODO configure and enable
+    //     T::Interrupt::unpend();
+    //     unsafe { T::Interrupt::enable() };
 
-        Self { inner: peri }
-    }
+    //     Self { inner: peri }
+    // }
 }
 
 trait SealedInstance: crate::rcc::RccPeripheral {
@@ -192,7 +193,7 @@ foreach_interrupt! {
     };
 }
 
-dma_trait!(Dma, Instance, FilterChannel);
+// dma_trait!(Dma, Instance, FilterChannel);
 
 /// Filter channel.
 #[derive(Clone, Copy)]
