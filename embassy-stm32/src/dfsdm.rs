@@ -17,6 +17,7 @@ impl<T: Instance> interrupt::typelevel::Handler<T::Interrupt> for InterruptHandl
     unsafe fn on_interrupt() {
         //TODO THIS IS DCMI STUFF
         crate::pac::DFSDM1.ch(0);
+        crate::pac::DFSDM2.ch(0);
         let ris = crate::pac::DCMI.ris().read();
         if ris.err_ris() {
             trace!("DCMI IRQ: Error.");
@@ -186,7 +187,7 @@ macro_rules! impl_peripheral {
 }
 
 foreach_interrupt! {
-    ($inst:ident, dfsdm, $block:ident, GLOBAL, $irq:ident) => {
+    ($inst:ident, dfsdm, $block:ident, FLT0, $irq:ident) => {
         impl_peripheral!($inst, $irq);
     };
 }
