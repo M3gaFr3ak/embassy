@@ -1179,7 +1179,6 @@ fn main() {
         (("rcc", "MCO_2"), quote!(crate::rcc::McoPin)),
         (("rcc", "MCO"), quote!(crate::rcc::McoPin)),
         (("comp", "OUT"), quote!(crate::comp::OutputPin)),
-        // (("dcmi", "D0"), quote!(crate::dcmi::KASTOMPIN)),
         (("dcmi", "D0"), quote!(crate::dcmi::D0Pin)),
         (("dcmi", "D1"), quote!(crate::dcmi::D1Pin)),
         (("dcmi", "D2"), quote!(crate::dcmi::D2Pin)),
@@ -2317,6 +2316,21 @@ fn main() {
 
                     let request = if let Some(request) = ch.request {
                         let request = request as u8;
+                        quote!(#request)
+                    } else if let Some(channel) = &ch.channel
+                        && ch.dmamux.is_none()
+                    {
+                        // Peripheral is connected directly to a DMA/BDMA channel without going
+                        // through a DMAMUX. In that case there is no separate "request number" —
+                        // the request IS the fixed channel index (e.g. BDMA1/DFSDM1 on H7A3/H7B3/H7B0,
+                        // see RM0455 §16.3.2). Verified only for that case; if other chip families
+                        // hit this branch, confirm the same equivalence holds for them too.
+                        let found_channel = METADATA
+                            .dma_channels
+                            .iter()
+                            .find(|dma| dma.name == *channel)
+                            .expect("DMA channel not found in metadata");
+                        let request = found_channel.channel as u8;
                         quote!(#request)
                     } else {
                         quote!(())
