@@ -64,6 +64,27 @@ Supersedes the old AI TODO docs (removed); their still-valid intent is absorbed 
   (repr `Dfsdm2ch1fltTrg5`, `Tcv2`, `Flt1`, delay/hwid/adc_input = false) plus
   `DFSDM_2CH_1FLT_TRG5` in the single-IRQ `impl_dfsdm_filter_irqs!`
   (FLT0 => Flt0) list in associations.rs.
+  NOTE: the `DFSDM_2CH_1FLT_TRG5` entry is already present in
+  `mark_dfsdm_instances!` — re-verify what the remaining DFSDM2 gap is (the
+  VERIFY `E0277` for h7a3zi/h7b3zi) before closing this.
+
+- [ ] **FT22 — Derive instance capabilities from the block name (string-match)
+  instead of the `mark_dfsdm_instances!` table.** The 13 DFSDM block names form
+  a closed grammar `DFSDM_{2,4,8}CH_{1,2,4,6,8}FLT[_DLY]_TRG{3,5}[_ADC][_HWID]`,
+  and build.rs already holds `regs.block`. Plan:
+  - build.rs string-matches `regs.block` → `Transceivers`/`Filters`/`HasDelay`/
+    `HasHwid`/`AdcInput`, then emits `impl SealedInstance` + `impl Instance` +
+    capability flags directly (drops `mark_dfsdm_instances!` +
+    `impl_dfsdm_instance!`).
+  - Drop `Instance::Repr` (dead: declared + assigned, never read; the driver
+    only touches `DfsdmSuperset`).
+  - **Interrupts stay in `foreach_interrupt!`**: make the IRQ binding
+    count-agnostic by unconditionally binding `Flt0..Flt7` (each `foreach_interrupt!`
+    arm matches only the `FLTx` rows the chip actually has), removing
+    `dfsdm_flt_irqs!` and the filter-count dependency from the interrupt side.
+  - **Neighbor ring stays** (`impl_next_channel!` + the splits.rs S-pairing):
+    chip-independent modulo-N successor, already once-per-arity, no string to
+    match — not a capability table, out of scope here.
 
 ---
 
@@ -775,7 +796,30 @@ Summary (each blocks DFSDM availability for whole chip groups):
   3-bit chips. Renumber to compact 0-7; verify each chip's encoding from the
   PDF (esp. F413 DFSDM2's garbled 4-column table). Pure data rename; no
   embassy driver change.
-  Actually fixed by `ValidTrigger<T, M>` system!!!!
+  **DONE via the trigger rework (see TRIGGER below) — no data renumber:**
+  build.rs emits `TriggerSource` impls directly, identity (`jextsel` == signal
+  number) on TRG5 and the remap (from `src/dfsdm/trigger_map.rs`) on TRG3.
+
+- [x] **TRIGGER — Trigger system rework (supersedes the "ValidTrigger" note).**
+  Deleted `InjectedTrigger`, `InjectedDfsdmTrigger`, `NoInjectedTrigger`,
+  `InjectedTriggerTrg3`, `Trg3Id`, `Trg0..Trg10`, the `dyn` blanket impl, the
+  `From` impl, and `dfsdm_trigger_identity!`/`dfsdm_trigger_custom!`. Public
+  surface is now two items:
+  - `TriggerSource<T, M>` (renamed from `ValidTrigger`): `jextsel(&self) -> u8`,
+    implemented by build.rs for each (instance, filter, source) the TRM allows.
+  - `InjectedTrigger<T, M>` (renamed from `AnyTrigger`): `Disabled` / `Enabled {
+    jextsel, edge }`, constructed via `InjectedTrigger::from(source, edge)`.
+  build.rs emits the impls directly — TRG5 = identity blanket over `M`
+  (`impl<M: FilterMarker> TriggerSource<T, M> for source { jextsel = idx }`),
+  TRG3 = per-(filter, source) from `src/dfsdm/trigger_map.rs`; no new
+  `foreach_*` table. `FilterConfig.trigger: InjectedTrigger<T, M>`.
+
+- [x] **Trigger-bit capability removal.** Deleted `Instance::Bits` +
+  `capability::TriggerBits{,3,5}` and the `trigger_bits` plumbing in
+  `mark_dfsdm_instances!` — the TRG3/TRG5 distinction now lives entirely in
+  build.rs (`regs.block`). Also found `Instance::Repr` dead (never read — fold
+  its removal into FT22) and `use core::sync::atomic::AtomicU32` at types.rs:1
+  unused (only `AtomicU8`/`AtomicWaker` are used).
 
 NOTE
 Following have no bken enable for dfsdm bits in timers. Do research

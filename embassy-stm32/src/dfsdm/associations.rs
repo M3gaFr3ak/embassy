@@ -275,6 +275,15 @@ mark_dfsdm_instances! {
         adc_input: true,
     },
 
+    DFSDM_8CH_4FLT_TRG3 => {
+        repr: Dfsdm8ch4fltTrg3,
+        transceivers: Tcv8,
+        filters: Flt4,
+        delay: false,
+        hwid: false,
+        adc_input: true,
+    },
+
     DFSDM_8CH_4FLT_TRG5_ADC => {
         repr: Dfsdm8ch4fltTrg5Adc,
         transceivers: Tcv8,
