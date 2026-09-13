@@ -67,14 +67,15 @@ pub(crate) trait SealedInstance: crate::rcc::RccPeripheral {
     fn regs() -> Registers;
 }
 
-/// DFSDM instance.
+/// A DFSDM peripheral instance.
 #[allow(private_bounds)]
 pub trait Instance: SealedInstance + PeripheralType + 'static {
-    /// Amount of transceivers in this instance
+    /// Number of transceivers on this instance.
     type Transceivers: capability::TransceiverCount;
-    /// Amount of filters in this instance
+    /// Number of filters on this instance.
     type Filters: capability::FilterCount;
 
+    /// Shared instance-level state.
     fn instance_state() -> &'static InstanceState;
     // type Split<C: ClockOutputMode>;
 
@@ -83,36 +84,38 @@ pub trait Instance: SealedInstance + PeripheralType + 'static {
     //     Self: Sized;
 }
 
-/// Type-level capability tags for DFSDM instance variants.
+/// Type-level capability tags for a DFSDM instance shape.
 pub(crate) mod capability {
-    /// 2 transceiver channels.
+    /// Two transceivers.
     pub struct Tcv2;
-    /// 4 transceiver channels.
+    /// Four transceivers.
     pub struct Tcv4;
-    /// 8 transceiver channels.
+    /// Eight transceivers.
     pub struct Tcv8;
 
-    /// 1 filter.
+    /// One filter.
     pub struct Flt1;
-    /// 2 filter.
+    /// Two filters.
     pub struct Flt2;
-    /// 4 filters.
+    /// Four filters.
     pub struct Flt4;
-    /// 6 filters.
+    /// Six filters.
     pub struct Flt6;
-    /// 8 filters.
+    /// Eight filters.
     pub struct Flt8;
 
-    /// Has Delay block in channel
+    /// Has a per-transceiver pulse-skipper block (DLY).
     pub trait HasDelay {}
 
-    /// Has a HWID block in the instance
+    /// Has the HWID hardware-information-register block.
     pub trait HasHwid {}
 
-    /// Accepts data directly from ADC
+    /// Accepts a parallel ADC input path (DATMPX = 1).
     pub trait AdcInput {}
 
+    /// Transceiver count of a shape.
     pub trait TransceiverCount: super::Shape {
+        /// Number of transceivers.
         const COUNT: u8;
     }
     impl TransceiverCount for Tcv2 {
@@ -124,7 +127,9 @@ pub(crate) mod capability {
     impl TransceiverCount for Tcv8 {
         const COUNT: u8 = 8;
     }
+    /// Filter count of a shape.
     pub trait FilterCount {
+        /// Number of filters.
         const COUNT: u8;
     }
     impl FilterCount for Flt1 {
@@ -144,7 +149,7 @@ pub(crate) mod capability {
     }
 }
 
-/// Marker trait for configuration shape
+/// Configuration shape: maps a transceiver count to its selector bundle.
 #[allow(private_bounds)]
 pub trait Shape: sealed::Sealed {
     /// Selector bundle `configure_pins` hands to its closure.
@@ -155,11 +160,11 @@ pub trait Shape: sealed::Sealed {
 
 impl_sealed!(capability::Tcv2, capability::Tcv4, capability::Tcv8);
 
-/// Marker trait for DFSDM clockmodes
+/// Marker trait for clock-output modes.
 pub trait ClockOutputMode: sealed::Sealed {}
 /// Clock output enabled
 pub struct OutputEnabled;
-/// No clock output
+/// Clock output disabled
 pub struct OutputDisabled;
 
 impl_sealed_and! {
@@ -198,27 +203,21 @@ macro_rules! define_dfsdm_pin_trait {
     };
 }
 
-define_dfsdm_pin_trait!(
-    CkinPin,
-    "Associates a DFSDM clock-input pin with a transceiver channel."
-);
+define_dfsdm_pin_trait!(CkinPin, "Associates a DFSDM clock-input pin with a transceiver.");
 
-define_dfsdm_pin_trait!(
-    DatinPin,
-    "Associates a DFSDM data-input pin with a transceiver channel."
-);
+define_dfsdm_pin_trait!(DatinPin, "Associates a DFSDM data-input pin with a transceiver.");
 
 // ============================================================
 // Pin presence markers (PinSet)
 // ============================================================
 
-/// Type-level pin presence of one channel. Exactly three states exist;
+/// Type-level pin presence of one transceiver. Exactly three states exist;
 /// "clock without data" has no representative and is therefore inexpressible.
 #[allow(private_bounds)]
 pub trait PinSet: sealed::Sealed {
-    /// Channel owns a DATIN pin.
+    /// Transceiver owns a DATIN pin.
     const HAS_DATA: bool;
-    /// Channel owns a CKIN pin.
+    /// Transceiver owns a CKIN pin.
     const HAS_CLK: bool;
     /// Storage for the DATIN pin: `Flex<'d>` if present, `()` if absent.
     type Datin<'d>;
@@ -231,13 +230,12 @@ pub trait PinSet: sealed::Sealed {
     fn extract_ckin<'d>(pin: Self::Ckin<'d>) -> Option<Flex<'d>>;
 }
 
-/// Channel has no pins (unused, parallel input, or PDM-right reading the
-/// next channel's line).
+/// Transceiver has no own pins (unused, parallel input, or borrowing the
+/// neighbor's).
 pub struct NoPins;
-/// Channel has a DATIN pin only (Manchester, CKOUT-clocked SPI, PDM left).
+/// Transceiver has a DATIN pin, no CKIN (clock from CKOUT or the neighbor).
 pub struct DataOnly;
-/// Channel has DATIN + CKIN (externally clocked SPI).
-
+/// Transceiver has a DATIN and a CKIN pin.
 pub struct DataClk;
 
 impl_sealed!(NoPins, DataOnly, DataClk);
@@ -289,7 +287,7 @@ pub trait HasData: PinSet {}
 impl HasData for DataOnly {}
 impl HasData for DataClk {}
 
-/// Pin sets that include a DataClk pin.
+/// Pin sets that include a DATIN and a CKIN pin.
 pub trait HasDataAndClk: PinSet {}
 impl HasDataAndClk for DataClk {}
 
@@ -297,17 +295,17 @@ impl HasDataAndClk for DataClk {}
 // Channel config tokens
 // ============================================================
 
-/// Token: channel gets no pins. Valid in any slot.
+/// Pin token: the transceiver gets no pins. Valid in any slot.
 pub struct NoPinsCfg;
 
-/// Token: channel gets a DATIN pin (AF already configured). Only accepted by
-/// the `configure_pins` slot belonging to `M`'s channel.
+/// Pin token: the transceiver gets a DATIN pin (AF already configured). Only
+/// accepted by the `configure_pins` slot belonging to `M`'s transceiver.
 pub struct DatinCfg<'d, T: Instance, M: TransceiverMarker> {
     pub(crate) datin: Flex<'d>,
     pub(crate) _m: PhantomData<(T, M)>,
 }
 
-/// Token: channel gets DATIN + CKIN.
+/// Pin token: the transceiver gets DATIN + CKIN.
 pub struct DckCfg<'d, T: Instance, M: TransceiverMarker> {
     pub(crate) datin: Flex<'d>,
     pub(crate) ckin: Flex<'d>,
@@ -317,12 +315,12 @@ pub struct DckCfg<'d, T: Instance, M: TransceiverMarker> {
 /// Accepted by one `configure_pins` slot. `Presence` is the type-level pin
 /// state that flows into the split.
 #[diagnostic::on_unimplemented(
-    message = "`{Self}` is not a valid pin token for this DFSDM channel",
-    label = "this token doesn't belong to channel `{M}`",
-    note = "return the token from the matching `creator.chN` selector - a token for one channel can't be reused on another"
+    message = "`{Self}` is not a valid pin token for this DFSDM transceiver",
+    label = "this token doesn't belong to transceiver `{M}`",
+    note = "return the token from the matching `creator.chN` selector - a token for one transceiver can't be reused on another"
 )]
 pub trait ChannelCfg<'d, T: Instance, M: TransceiverMarker> {
-    /// Pin presence of the declaring channel.
+    /// Pin presence of the declaring transceiver.
     type Presence: PinSet;
     /// Consume the token, yielding its pins in storage form
     /// (`()` for absent, `Flex` for present - no unwrapping anywhere).
@@ -362,16 +360,23 @@ impl<'d, T: Instance, M: TransceiverMarker> ChannelCfg<'d, T, M> for DckCfg<'d, 
 // Interrupthandler
 // =============================================================================
 
-/// Filter-marked interrupt state trait
+/// Per-filter interrupt binding: maps a filter marker to its interrupt type
+/// and state.
 pub trait FilterInterrupt<F: FilterMarker> {
-    /// Interrupt type
+    /// Interrupt type for this filter.
     type Interrupt: interrupt::typelevel::Interrupt;
 
-    /// Filter-interrupt state
+    /// Filter-interrupt state.
     fn state() -> &'static State;
 }
-/// Instance-level interrupt-handling
+/// Instance-level interrupt handling for a filter marker. [`Flt0`] performs the
+/// real handling; the other markers yield no-ops.
 pub trait InstanceEvents<T: Instance> {
+    /// Handles the instance-level events.
+    ///
+    /// # Safety
+    ///
+    /// Caller must be the interrupt handler for this filter.
     unsafe fn handle_instance_events();
 }
 
@@ -413,7 +418,7 @@ define_dfsdm_ready!(Flt8Ready, [Flt0, Flt1, Flt2, Flt3, Flt4, Flt5, Flt6, Flt7])
 // Interrupt/FilterChannel state
 // =============================================================================
 
-/// State shared between interrupt filter-subroutine and filter object
+/// State shared between a filter's interrupt handler and its filter object.
 pub struct State {
     /// Waker for the injected requests
     pub injected_waker: AtomicWaker,
@@ -434,7 +439,7 @@ impl State {
     }
 }
 
-/// State shared between interrupt instance-subroutine and filter object
+/// State shared between an instance's interrupt handler and its detectors.
 pub struct InstanceState {
     /// Bitmask of transceivers whose short-circuit detector the driver has armed
     /// (aggregate SCDEN mirror; driver is the sole writer).
@@ -476,20 +481,20 @@ macro_rules! define_indexed_channels {
         ),+ $(,)?
     ) => {
 
-        #[doc = concat!($channel_string, " channel identifier.")]
+        #[doc = concat!($channel_string, " identifier.")]
         #[repr(usize)]
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         pub enum $enum {
             $(
 
-                #[doc = concat!($channel_string, " channel identifier ", stringify!($index), ".")]
+                #[doc = concat!($channel_string, " identifier ", stringify!($index), ".")]
                 $channel = $index,
             )+
         }
 
         impl $enum {
 
-            /// Index of the channel
+            #[doc = concat!("Index of the ", $channel_string, ".")]
             pub const fn index(self) -> usize {
                 self as usize
             }
@@ -501,7 +506,7 @@ macro_rules! define_indexed_channels {
         }
 
         $(
-            #[doc = concat!($channel_string, " channel marker ", stringify!($index), ".")]
+            #[doc = concat!($channel_string, " marker ", stringify!($index), ".")]
             pub struct $channel;
 
             #[allow(missing_docs)]
@@ -613,11 +618,11 @@ impl_sealed_and! {
 // Channel-level markertraits
 // =============================================================================
 
-/// Marks a Transceiverchannel as being allowed to set Datapacking dual-mode.
+/// Marks transceivers allowed to use dual data-packing mode.
 #[diagnostic::on_unimplemented(
-    message = "Dual packing mode is only available on even channels (0, 2, 4, 6)",
-    label = "`{Self}` is odd - dual mode requires an even channel",
-    note = "call `new_parallel_dma_dual` on the even channel instead"
+    message = "Dual packing mode is only available on even transceivers (0, 2, 4, 6)",
+    label = "`{Self}` is odd - dual mode requires an even transceiver",
+    note = "call `new_parallel_dma_dual` on the even transceiver instead"
 )]
 pub trait DualPackingAllowed: sealed::Sealed {}
 
@@ -652,12 +657,12 @@ impl_sealed_and! {
     ParallelAdcMode,
 }
 
-/// Marker for channel modes that carry a serial stream a delay-block pulse
-/// skipper can act on. Not implemented for ParallelAdcMode/ParallelDmaMode.
+/// Marker for modes that carry a serial stream a delay-block pulse skipper
+/// can act on. Not implemented for [`ParallelAdcMode`]/[`ParallelDmaMode`].
 pub trait SerialMode: ChannelMode {}
 
-/// Marker for serial channel modes relying on an external clock,
-/// used for clock-absence-detection-sync function gating
+/// Marker for serial modes relying on an external clock; gates
+/// clock-absence-detection sync.
 pub trait ExternalSerialMode: SerialMode {}
 
 impl_trait! {
@@ -674,11 +679,11 @@ impl_trait! {
 }
 // ParallelAdcMode, ParallelDmaMode deliberately excluded
 
-/// Which transceiver's serial pins this channel's interface consumes
-/// (CFGR1.CHINSEL). Pins are borrowed from that channel's slot, so
+/// Which transceiver's serial pins this transceiver's interface consumes
+/// (CFGR1.CHINSEL). Pins are borrowed from that transceiver's slot, so
 /// acquire/release live there too (see `Drop`).
 pub trait PinSource: sealed::Sealed {
-    /// Consume the next channel's pins instead of this channel's own.
+    /// Consume the next transceiver's pins instead of this transceiver's own.
     const FROM_NEIGHBOR: bool;
 }
 /// CHINSEL = 0
@@ -695,16 +700,16 @@ impl PinSource for OwnPins {
 impl PinSource for NeighborPins {
     const FROM_NEIGHBOR: bool = true;
 }
-/// Per-instance "successor" channel.
+/// Per-instance "successor" transceiver.
 ///
 /// `C` is the instance's transceiver-capability (`<T as Instance>::Transceivers`),
 /// so the modulo-N wrap depends on the instance shape, not on the marker itself.
 pub trait NextChannel<C: capability::TransceiverCount>: TransceiverMarker {
-    /// Marker of the next channel, modulo the capability's max count.
+    /// Marker of the next transceiver, modulo the capability's max count.
     type Next: TransceiverMarker;
 }
 
-/// Convenience trait to get the next channel directly from an Instance
+/// Convenience trait to get the next transceiver directly from an instance.
 pub trait NextChannelForInstance<T: Instance>: TransceiverMarker {
     /// Type representing the next TransceiverMarker in the sequence
     type Next: TransceiverMarker;
@@ -760,12 +765,18 @@ impl_next_channel!(capability::Tcv8,
 
 dma_trait!(Dma, Instance, FilterMarker); //TODO
 
+/// No DMA.
 pub struct NoDma;
+/// Regular-conversion DMA.
 pub struct RegDma;
+/// Injected-conversion DMA.
 pub struct InjDma;
 
+/// DMA mode of a filter half.
 pub trait DmaMode: sealed::Sealed {
+    /// Whether regular conversions use DMA.
     const REG_ENABLED: bool;
+    /// Whether injected conversions use DMA.
     const INJ_ENABLED: bool;
 }
 
@@ -784,15 +795,19 @@ impl DmaMode for InjDma {
     const INJ_ENABLED: bool = true;
 }
 
+/// DMA half of a filter, erased over the concrete half type.
 pub trait FilterDma<T, M>
 where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
+    /// Pointer to the filter's data register.
     fn data_register(&mut self) -> *mut u32;
 
+    /// Starts the conversion.
     fn start_conversion(&mut self);
 
+    /// Checks and clears the overrun flag; returns whether it was set.
     fn get_and_clear_overrun(&mut self) -> bool;
 }
 
@@ -800,8 +815,8 @@ where
 // Generification traits
 // =============================================================================
 
-/// Trait for transceivers to generify all transceivers
-/// over one instance for Filterconfiguration
+/// Erases all transceivers of an instance into one type, for filter
+/// configuration.
 pub trait TransceiverTrait<T, P>: sealed::Sealed
 where
     T: Instance,
@@ -855,7 +870,7 @@ impl_non_empty!(1, 2, 3, 4, 5, 6, 7, 8);
 /// Register config types
 pub mod config_types {
 
-    /// Output serial clock source selection
+    /// Output serial clock source.
     #[derive(Copy, Clone)]
     pub enum CkoutSource {
         /// Source for output clock is from system clock
@@ -882,7 +897,7 @@ pub mod config_types {
     impl CkoutDivider {
         /// Create from the actual divider value (2..=256).
         /// Panics if out of range.
-        /// For a runtime-stabler variant try [`CkoutDivider::try_from`]
+        /// For a non-panicking variant, use [`CkoutDivider::try_from`].
         pub fn new(divider: u16) -> Self {
             assert!((2..=256).contains(&divider), "CKOUT divider must be 2..=256");
             Self((divider - 1) as u8)
@@ -916,16 +931,16 @@ pub mod config_types {
         }
     }
 
-    /// AWFORD register value.
+    /// AWFOSR register value.
     ///
-    /// 0 = AW Filter disabled; 1..=31 = enabled (actual OSR = value + 1, range 2..=32).
+    /// 0 = AW filter disabled; 1..=31 = enabled (actual OSR = value + 1, range 2..=32).
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct AwdFilterOsr(u8);
 
     impl AwdFilterOsr {
         /// Create from the actual OSR value (2..=32).
         /// Panics if out of range.
-        /// For a runtime-stabler variant try [`AnalogWatchdogOsr::try_from`]
+        /// For a non-panicking variant, use [`AwdFilterOsr::try_from`].
         pub fn new(divider: u16) -> Self {
             assert!((2..=32).contains(&divider), "OSR must be 2..=32");
             Self((divider - 1) as u8)
@@ -985,12 +1000,12 @@ pub mod config_types {
         // 3 = Reserved
     }
 
-    /// Channel inputs selection
+    /// Input pin selection for a transceiver.
     #[derive(Copy, Clone)]
     pub enum ChannelInput {
-        /// Channel inputs are taken from pins of the same channel y
+        /// Inputs are taken from this transceiver's own pins.
         Same,
-        /// Channel inputs are taken from pins of the following channel (channel (y+1) modulo 8)
+        /// Inputs are taken from the next transceiver's pins (modulo 8).
         Neighbor,
     }
 
@@ -1016,11 +1031,11 @@ pub mod config_types {
         // 3 = Reserved
     }
 
-    ///SPI clock select for channel
+    /// SPI clock select for a transceiver.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[repr(u8)]
     pub enum SpiClockSelect {
-        /// Clock coming from external CKIN pin of the channel
+        /// Clock coming from external CKIN pin of the transceiver
         /// sampling point according to [`SerialInterfaceType`]
         ExternalCkin = 0,
         /// Clock coming from the internal CKOUT output
@@ -1034,7 +1049,7 @@ pub mod config_types {
         InternalCkoutRisingHalved = 3,
     }
 
-    /// Type of the serial interface
+    /// Serial interface type.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[repr(u8)]
     pub enum SerialInterfaceType {
@@ -1048,7 +1063,7 @@ pub mod config_types {
         ManchesterRising1 = 3,
     }
 
-    /// Filter order of the analog watchdogs Filter
+    /// Filter order of the analog watchdog's fast filter.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[repr(u8)]
     pub enum AwdFilterOrder {
@@ -1063,7 +1078,7 @@ pub mod config_types {
     }
 
     bitflags::bitflags! {
-        /// Maps breaksignal connections per source channel
+        /// Maps break-signal connections per source transceiver.
         #[derive(Clone, Copy, PartialEq, Eq)]
         pub struct BreakSignals: u8 {
             ///BREAK0 signal connected
@@ -1077,7 +1092,7 @@ pub mod config_types {
         }
     }
 
-    /// Data right bit-shift for channel results (CFGR2.DTRBS).
+    /// Data right bit-shift for transceiver results (CFGR2.DTRBS).
     ///
     /// 0..=31 bits, applied before offset correction; 0 = no shift.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -1085,7 +1100,7 @@ pub mod config_types {
 
     impl DataRightShift {
         /// Create from the shift amount in bits (0..=31). Panics if out of range.
-        /// For a runtime-stabler variant try [`DataRightShift::try_from`].
+        /// For a non-panicking variant, use [`DataRightShift::try_from`].
         pub fn new(shift: u8) -> Self {
             assert!(shift <= 31, "data right shift must be 0..=31");
             Self(shift)
@@ -1120,7 +1135,7 @@ pub mod config_types {
 
     impl PulsesToSkip {
         /// Create from the number of samples to skip (0..=63). Panics if out of range.
-        /// For a runtime-stabler variant try [`PulsesToSkip::try_from`].
+        /// For a non-panicking variant, use [`PulsesToSkip::try_from`].
         pub fn new(pulses: u8) -> Self {
             assert!(pulses <= 63, "pulses to skip must be 0..=63");
             Self(pulses)
@@ -1235,7 +1250,7 @@ pub mod config_types {
         }
     }
 
-    /// Filter order of the analog watchdogs Filter
+    /// Filter order of the analog watchdog's fast filter.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub enum AwdFilterConfig {
         /// Filter bypassed
@@ -1395,7 +1410,7 @@ pub mod config_types {
         }
     }
 
-    /// Filter parameters for Filter configuration
+    /// Filter parameters (order, OSR and input width) for a filter.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub struct FilterParameters {
         order: FilterOrder,
@@ -1406,7 +1421,7 @@ pub mod config_types {
     impl FilterParameters {
         /// Create from FilterOrder (carrying its FOSR) and the actual IOSR value,
         /// assuming a 1-bit serial input. Panics if out of range.
-        /// For a runtime-stabler variant try [`FilterParameters::try_new`].
+        /// For a non-panicking variant, use [`FilterParameters::try_new`].
         /// For parallel (ADC/DMA) inputs use [`FilterParameters::new_for_width`].
         pub fn new(order: FilterOrder, iosr: u16) -> Self {
             Self::new_for_width(order, iosr, InputWidth::Serial)
@@ -1534,7 +1549,7 @@ pub mod config_types {
         }
     }
 
-    /// Type of the serial interface
+    /// Trigger edge selection for injected conversions.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[repr(u8)]
     pub enum TriggerEdge {
