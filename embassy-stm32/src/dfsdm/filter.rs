@@ -1006,6 +1006,7 @@ define_dfsdm_ready!(Flt8Ready, [Flt0, Flt1, Flt2, Flt3, Flt4, Flt5, Flt6, Flt7])
 // =============================================================================
 
 /// State shared between a filter's interrupt handler and its filter object.
+#[derive(Default)]
 pub struct State {
     /// Waker for the injected requests
     pub injected_waker: AtomicWaker,
@@ -1016,7 +1017,11 @@ pub struct State {
 }
 
 impl State {
-    /// Instantiate fresh State
+    /// Instantiate a fresh `State`.
+    ///
+    /// This is `const` so it can initialize `static STATE` (see
+    /// [`InstanceState::new`]); use [`Default`] where a non-`const` value is
+    /// more convenient.
     pub const fn new() -> Self {
         Self {
             injected_waker: AtomicWaker::new(),
@@ -1027,6 +1032,7 @@ impl State {
 }
 
 /// State shared between an instance's interrupt handler and its detectors.
+#[derive(Default)]
 pub struct InstanceState {
     /// Bitmask of transceivers whose short-circuit detector the driver has armed
     /// (aggregate SCDEN mirror; driver is the sole writer).
@@ -1044,7 +1050,11 @@ pub struct InstanceState {
 }
 
 impl InstanceState {
-    /// Instantiate fresh State
+    /// Instantiate a fresh `InstanceState`.
+    ///
+    /// This is `const` so it can initialize `static INSTANCE_STATE` (emitted
+    /// by build.rs); use [`Default`] where a non-`const` value is more
+    /// convenient.
     pub const fn new() -> Self {
         Self {
             short_circuit_armed: AtomicU8::new(0),

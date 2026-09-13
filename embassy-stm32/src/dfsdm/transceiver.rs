@@ -54,6 +54,28 @@ where
     _powerstate_marker: PhantomData<P>,
 }
 
+impl<'a, 'd, T, M, S, MODE, PS, P> Transceiver<'a, 'd, T, M, S, MODE, PS, P>
+where
+    T: Instance,
+    M: TransceiverMarker + NextChannelForInstance<T>,
+    S: PinSet,
+    MODE: ChannelMode,
+    PS: PinSource,
+    P: PowerState,
+{
+    fn new(common: &'a DfsdmCommon<'d, T, Enabled>) -> Self {
+        Self {
+            common,
+            _instance_marker: PhantomData,
+            _transceiver_marker: PhantomData,
+            _pinset_marker: PhantomData,
+            _channel_mode_marker: PhantomData,
+            _pin_source_marker: PhantomData,
+            _powerstate_marker: PhantomData,
+        }
+    }
+}
+
 impl<'a, 'd, T, M, S, MODE, PS, P> Drop for Transceiver<'a, 'd, T, M, S, MODE, PS, P>
 where
     T: Instance,
@@ -102,15 +124,7 @@ where
 
         let common = self.common;
         core::mem::forget(self);
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 }
 
@@ -135,7 +149,7 @@ where
             #[cfg(not(feature = "time"))]
             {
                 let freq = unsafe { crate::rcc::get_freqs() }.sys.to_hertz().unwrap().0 as u64;
-                let cycles = freq * 1 / 1_000; // 1ms
+                let cycles = freq / 1_000; // 1ms
                 cortex_m::asm::delay(cycles as u32);
             }
         }
@@ -158,15 +172,7 @@ where
         let common = self.common;
         core::mem::forget(self);
 
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 
     /// Set the transceiver's right-shift factor.
@@ -285,6 +291,14 @@ where
     }
 }
 
+/// The two transceivers returned by
+/// [`TransceiverBuilder::build_parallel_dma_dual`]: this channel (`M`/`S`, owns
+/// the DATINR register) and its paired successor (`MN`/`SN`, reads INDAT1).
+pub type ParallelDmaPair<'a, 'd, T, M, S, MN, SN> = (
+    Transceiver<'a, 'd, T, M, S, ParallelDmaMode, OwnPins, Disabled>,
+    Transceiver<'a, 'd, T, MN, SN, ParallelDmaMode, OwnPins, Disabled>,
+);
+
 /// Used to build a [`Transceiver`].
 pub struct TransceiverBuilder<T, M, C, S, SN>
 where
@@ -323,15 +337,7 @@ where
     {
         self.select_channel_input(config::ChannelInput::Same);
         self.select_data_mux_input(config::InputDataMux::InternalAdc);
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 
     /// Parallel input from CPU/DMA writes to CHyDATINR (DATMPX=2).
@@ -346,15 +352,7 @@ where
         self.select_channel_input(config::ChannelInput::Same);
         self.select_data_mux_input(config::InputDataMux::InternalRegisterWrite);
         self.set_data_packing_mode(packing_mode.into());
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 
     /// Create a dual-mode DMA pair.
@@ -368,10 +366,7 @@ where
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,
         mut neighbor: TransceiverBuilder<T, MN, C, SN, SNN>,
-    ) -> (
-        Transceiver<'a, 'd, T, M, S, ParallelDmaMode, OwnPins, Disabled>,
-        Transceiver<'a, 'd, T, MN, SN, ParallelDmaMode, OwnPins, Disabled>,
-    )
+    ) -> ParallelDmaPair<'a, 'd, T, M, S, MN, SN>
     where
         M: DualPackingAllowed + NextChannelForInstance<T, Next = MN>,
         MN: TransceiverMarker + NextChannelForInstance<T>,
@@ -383,26 +378,7 @@ where
         neighbor.select_data_mux_input(config::InputDataMux::InternalRegisterWrite);
         self.set_data_packing_mode(config::DataPackingMode::Dual);
         neighbor.set_data_packing_mode(config::DataPackingMode::Standard);
-        (
-            Transceiver {
-                common,
-                _instance_marker: PhantomData,
-                _transceiver_marker: PhantomData,
-                _pinset_marker: PhantomData,
-                _channel_mode_marker: PhantomData,
-                _pin_source_marker: PhantomData,
-                _powerstate_marker: PhantomData,
-            },
-            Transceiver {
-                common,
-                _instance_marker: PhantomData,
-                _transceiver_marker: PhantomData,
-                _pinset_marker: PhantomData,
-                _channel_mode_marker: PhantomData,
-                _pin_source_marker: PhantomData,
-                _powerstate_marker: PhantomData,
-            },
-        )
+        (Transceiver::new(common), Transceiver::new(common))
     }
 
     /// Manchester-coded input over this transceiver's own DATIN pin (SITP = 2/3,
@@ -420,15 +396,7 @@ where
         self.select_channel_input(config::ChannelInput::Same);
         self.select_data_mux_input(config::InputDataMux::ExternalSerial);
         self.select_serial_interface_type(mode.into());
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 
     /// Same as [`Self::build_manchester`], but using the neighbor's pins.
@@ -446,15 +414,7 @@ where
         self.select_channel_input(config::ChannelInput::Neighbor);
         self.select_data_mux_input(config::InputDataMux::ExternalSerial);
         self.select_serial_interface_type(mode.into());
-        Ok(Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        })
+        Ok(Transceiver::new(common))
     }
 
     /// SPI input over this transceiver's own pins (DATMPX=0, SPICKSEL=0): sampling
@@ -472,15 +432,7 @@ where
         self.select_data_mux_input(config::InputDataMux::ExternalSerial);
         self.select_serial_interface_type(mode.into());
         self.select_spi_clock(config::SpiClockSelect::ExternalCkin);
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 
     /// Same as [`Self::build_spi_ext`], but using the neighbor's pins.
@@ -499,15 +451,7 @@ where
         self.select_data_mux_input(config::InputDataMux::ExternalSerial);
         self.select_serial_interface_type(mode.into());
         self.select_spi_clock(config::SpiClockSelect::ExternalCkin);
-        Ok(Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        })
+        Ok(Transceiver::new(common))
     }
 
     fn set_data_packing_mode(&mut self, mode: config::DataPackingMode) {
@@ -579,15 +523,7 @@ where
         self.select_data_mux_input(config::InputDataMux::ExternalSerial);
         self.select_serial_interface_type(mode.into());
         self.select_spi_clock(mode.into());
-        Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        }
+        Transceiver::new(common)
     }
 
     /// Same as [`Self::build_spi_int`], but using the neighbor's pins.
@@ -606,15 +542,7 @@ where
         self.select_data_mux_input(config::InputDataMux::ExternalSerial);
         self.select_serial_interface_type(mode.into());
         self.select_spi_clock(mode.into());
-        Ok(Transceiver {
-            common,
-            _instance_marker: PhantomData,
-            _transceiver_marker: PhantomData,
-            _pinset_marker: PhantomData,
-            _channel_mode_marker: PhantomData,
-            _pin_source_marker: PhantomData,
-            _powerstate_marker: PhantomData,
-        })
+        Ok(Transceiver::new(common))
     }
 }
 

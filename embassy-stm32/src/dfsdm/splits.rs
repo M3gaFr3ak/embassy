@@ -55,6 +55,10 @@ pub trait Tcv8SplitBuild<
     type Out;
 
     /// Registers the pins with `common` and constructs the split.
+    ///
+    /// The eight `(datin, ckin)` tuples are the point of the API: they carry
+    /// each channel's type-level pin pair, so the arity is load-bearing.
+    #[allow(clippy::too_many_arguments)]
     fn build<'d>(
         common: &mut DfsdmCommon<'d, T, Enabled>,
         ch0: (S0::Datin<'d>, S0::Ckin<'d>),

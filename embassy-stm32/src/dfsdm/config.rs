@@ -1,6 +1,8 @@
 //! Config value types used across the driver: filter parameters, data packing
 //! and shift modes, clock/output sources, and trigger/edge configuration.
 
+use super::Error;
+
 // =============================================================================
 // Config types
 // =============================================================================
@@ -565,7 +567,11 @@ impl FilterParameters {
     /// Try to create from the actual OSR value, assuming a 1-bit serial input.
     /// See TRM or [`FilterOrder::max_osr`] for valid OSR and IOSR.
     /// Filter gain and total gain must each <= 2^31.
-    pub fn try_new(order: FilterOrder, iosr: u16) -> Result<Self, ()> {
+    ///
+    /// Returns [`Error::InvalidFilterParameters`] if `iosr` is outside
+    /// `1..=256`, the filter order's FOSR is invalid, or the resulting gain
+    /// exceeds the ceiling.
+    pub fn try_new(order: FilterOrder, iosr: u16) -> Result<Self, Error> {
         Self::try_new_for_width(order, iosr, InputWidth::Serial)
     }
 
@@ -580,14 +586,18 @@ impl FilterParameters {
     /// Try to create from the actual OSR value and the effective input
     /// bit-width. Filter gain and total gain must each fit under
     /// [`max_gain`] for the given `width`.
-    pub fn try_new_for_width(order: FilterOrder, iosr: u16, width: InputWidth) -> Result<Self, ()> {
+    ///
+    /// Returns [`Error::InvalidFilterParameters`] if `iosr` is outside
+    /// `1..=256`, the filter order's FOSR is invalid, or the resulting gain
+    /// exceeds the ceiling for `width`.
+    pub fn try_new_for_width(order: FilterOrder, iosr: u16, width: InputWidth) -> Result<Self, Error> {
         if (1..=256).contains(&iosr) && order.fosr() > 0 {
             let params = Self { order, iosr, width };
             if params.total_gain_checked().is_some() {
                 return Ok(params);
             }
         }
-        Err(())
+        Err(Error::InvalidFilterParameters)
     }
 
     /// Skips the input-width gain-ceiling check entirely. For callers who
@@ -605,7 +615,11 @@ impl FilterParameters {
     /// that case (`as u32`) - use [`FilterParameters::total_gain_wide`] for
     /// a lossless `u128` reading, and prefer it when constructing via this
     /// method.
-    pub fn new_ignore_gain_ceiling(order: FilterOrder, iosr: u16) -> Result<Self, ()> {
+    ///
+    /// Returns [`Error::InvalidFilterParameters`] if `iosr` is outside
+    /// `1..=256`, the filter order's FOSR is invalid, or the gain
+    /// computation itself overflows `u128`.
+    pub fn new_ignore_gain_ceiling(order: FilterOrder, iosr: u16) -> Result<Self, Error> {
         if (1..=256).contains(&iosr) && order.fosr() > 0 && order.valid() {
             Ok(Self {
                 order,
@@ -613,7 +627,7 @@ impl FilterParameters {
                 width: InputWidth::Serial,
             })
         } else {
-            Err(())
+            Err(Error::InvalidFilterParameters)
         }
     }
 

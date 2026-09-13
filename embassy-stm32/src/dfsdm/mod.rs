@@ -49,6 +49,9 @@ pub enum Error {
     NeighborPinUnavailable,
     /// No data available yet.
     NotReady,
+    /// Invalid filter parameters: FOSR/IOSR out of range, or the resulting
+    /// filter gain exceeds the allowed ceiling for the input width.
+    InvalidFilterParameters,
 }
 
 // =============================================================================
@@ -254,13 +257,13 @@ impl<'d, T: Instance, P: PowerState> DfsdmCommon<'d, T, P> {
         if S::HAS_DATA {
             self.acquire_pin(ch, PinKind::Datin)?;
         }
-        if S::HAS_CLK {
-            if let Err(e) = self.acquire_pin(ch, PinKind::Ckin) {
-                if S::HAS_DATA {
-                    self.release_pin(ch, PinKind::Datin);
-                }
-                return Err(e);
+        if S::HAS_CLK
+            && let Err(e) = self.acquire_pin(ch, PinKind::Ckin)
+        {
+            if S::HAS_DATA {
+                self.release_pin(ch, PinKind::Datin);
             }
+            return Err(e);
         }
         Ok(())
     }
