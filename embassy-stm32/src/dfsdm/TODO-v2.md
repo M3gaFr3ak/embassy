@@ -28,11 +28,12 @@ Supersedes the old AI TODO docs (removed); their still-valid intent is absorbed 
 
 ## FIX
 
-- [ ] **F5 — Break-enable bit map.** Break-enable bits span
+- [X] **F5 — Break-enable bit map.** Break-enable bits span
   TIM1_AF1 (BKDF1BK0E→BRK1←break0), TIM1_AF2 (BK2DF1BK1E→BRK2←break1),
   TIM8_AF1 (BKDF1BK2E→BRK1←break2), TIM8_AF2 (BK2DF1BK3E→BRK2←break3),
-  TIM15/16/17_AF1 (BKDF1BKE→BRK←break0/1/2 per timer). DFSDM2 break[0] →
-  LPTIM3_ETR (no TIM register involved; document only).
+  TIM15/16/17_AF1 (BKDF1BKE→BRK←break0/1/2 per timer). DONE via FT5 (timer
+  break enables landed). DFSDM2 break[0] → LPTIM3_ETR (no TIM register
+  involved) remains dormant — see SD6.
 
 ---
 
@@ -57,16 +58,14 @@ Supersedes the old AI TODO docs (removed); their still-valid intent is absorbed 
 - [ ] **FT9 (optional) — `CkoutDivider::for_manchester(rate)` helper** from the
   RM0455 Manchester formula:
   `(CKOUTDIV+1)·T_INCKOUT < T_manchester < 2·CKOUTDIV·T_INCKOUT`.
-- [ ] **FT10 — Embassy impl for `DFSDM_2CH_1FLT_TRG5` (H7A/B DFSDM2).** The
+- [X] **FT10 — Embassy impl for `DFSDM_2CH_1FLT_TRG5` (H7A/B DFSDM2).** The
   data already emits this block for H7A3/H7B3/H7B0 (2ch/1flt, 32 triggers,
   no DLY, no ADC) and the metapac repr `Dfsdm2ch1fltTrg5` exists — only the
-  HAL entry is missing. Add one `mark_dfsdm_instances!` entry
-  (repr `Dfsdm2ch1fltTrg5`, `Tcv2`, `Flt1`, delay/hwid/adc_input = false) plus
-  `DFSDM_2CH_1FLT_TRG5` in the single-IRQ `impl_dfsdm_filter_irqs!`
-  (FLT0 => Flt0) list in associations.rs.
-  NOTE: the `DFSDM_2CH_1FLT_TRG5` entry is already present in
-  `mark_dfsdm_instances!` — re-verify what the remaining DFSDM2 gap is (the
-  VERIFY `E0277` for h7a3zi/h7b3zi) before closing this.
+  HAL entry was missing. DONE: the remaining gap was the DFSDM2 interrupt
+  model — DFSDM2 uses a single global `DFSDM2` interrupt (signals `FLT0..FLT7`
+  all share it); the driver works because DFSDM2 is `Flt1` (only `Flt0`).
+  stm32h7a3zi / stm32h7b3zi / stm32h7b0ab now compile (the VERIFY `E0277 ×24`
+  is resolved after the embassy rebase onto main).
 
 - [ ] **FT22 — Derive instance capabilities from the block name (string-match)
   instead of the `mark_dfsdm_instances!` table.** The 13 DFSDM block names form
@@ -197,29 +196,32 @@ Supersedes the old AI TODO docs (removed); their still-valid intent is absorbed 
 Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
 Summary (each blocks DFSDM availability for whole chip groups):
 
-- [ ] **SD1 — `header.rs` ALT_PERI_DEFINES:** `DFSDM1 → DFSDM1_BASE /
+- [X] **SD1 — `header.rs` ALT_PERI_DEFINES:** `DFSDM1 → DFSDM1_BASE /
   DFSDM1_BASE_NS` (unlocks L552/562; L5 headers define only the `_NS` alias —
-  TrustZone `DFSDM1SEC`).
-- [ ] **SD2 — `perimap.rs`:** `F7[6]` → `F7[67]` (F777/778/779).
-- [ ] **SD3 — `perimap.rs`:** replace the three dead L4 patterns
+  TrustZone `DFSDM1SEC`). DONE.
+- [X] **SD2 — `perimap.rs`:** `F7[6]` → `F7(6|7)` (F777/778/779). DONE.
+- [X] **SD3 — `perimap.rs`:** replaced the three dead L4 patterns
   (`L4[9]2`/`L4[10]`/`L4[11]`) with L4x1 (`dfsdm1_v1_0_4ch_L4x1`) →
-  `DFSDM_4CH_2FLT_TRG3` (plain — rm0394 says no ADC) and L47x/48x
-  (`dfsdm1_v1_0_Cube`) → `DFSDM_8CH_4FLT_TRG3`.
-- [ ] **SD4 — `trigger.rs`:** `H7(A|B)3` → `H7(A|B)` (H7B0).
-- [ ] **SD5 — `trigger.rs`:** fix F413 JTRG signal names (orphaned footnote
+  `DFSDM_4CH_2FLT_TRG3` (plain — rm0394 says no ADC), L47x/48x
+  (`dfsdm1_v1_0_Cube`) → new `DFSDM_8CH_4FLT_TRG3` (no-ADC block added), and
+  L49x/4Ax → `DFSDM_8CH_4FLT_TRG3_ADC`. DONE.
+- [X] **SD4 — `trigger.rs`:** `H7(A|B)3` → `H7(A3|B3|B0)` (H7B0). DONE.
+- [X] **SD5 — `trigger.rs`:** fixed F413 JTRG signal names (orphaned footnote
   digits — resolved mapping in stm32-data TODO SD5; RM0430 has no MMS2);
-  DFSDM1 jtrg4/6/8 stay reserved.
+  DFSDM1 jtrg4/6/8 stay reserved. DONE.
 - [ ] **SD6 (dormant) — LPTIM3_ETR ← DFSDM2_BREAK0 (H7A/B).** Blocked on
   unmodeled LPTIM ETR input signal; not blocking anything else.
-- [ ] **SD7 (minor) — MP1 RCC `ADFSDMEN`/`ADFSDMLPEN`.** Needed for CKOUTSRC=
-  audio on MP1; MP1 not embassy-supported.
-- [ ] **SD8 (minor) — H7A/B DFSDM2 kernel clock mux.** Wire `DFSDM2SEL` when
-  DFSDM2 support lands in embassy.
+- [X] **SD7 (minor) — MP1 RCC `ADFSDMEN`/`ADFSDMLPEN`.** Already present in
+  `rcc_mp1.yaml` (bit 21) — no-op. Needed for CKOUTSRC=audio on MP1; MP1 not
+  embassy-supported.
+- [X] **SD8 (minor) — H7A/B DFSDM2 kernel clock mux.** DONE — added `DFSDM2SEL`
+  enum (`PCLK4`/`SYS`); DFSDM2 kernel clock now derived as a mux.
 - [ ] **SD9 (info, no action) — MP13 chips absent.** Perimap regex correct but
   dormant.
-- [ ] Regenerate data + metapac (after SD1-SD5, SD10); after this, the
+- [X] Regenerate data + metapac (after SD1-SD5, SD10); after this, the
   variants exist for F777-779, L451/452/462, L471/475/476/485/486, L552/562,
-  H7B0.
+  H7B0. DONE — 394 DFSDM chips, 0 unmapped, all 13 blocks correct; metapac
+  dedup 0 true misses.
 
 ---
 
@@ -244,22 +246,20 @@ Summary (each blocks DFSDM availability for whole chip groups):
 
 ## VERIFY
 
-- [ ] `cargo check` + clippy on the DFSDM chip matrix (expanded after the
+- [X] `cargo check` + clippy on the DFSDM chip matrix (expanded after the
   stm32-data fixes + regeneration). Loop with `set -o pipefail` — a bare
   `cargo check | tail` masks the exit code:
   - passing (FT12 matrix run): stm32h755zi-cm7, stm32l496zg, stm32l4a6zg
   - passing (F7 2FLT fix, 2026-09-11): stm32f412zg, stm32f413zh —
     previously E0425 (`capability::Flt2` undefined, see F7)
-  - known-stale (no `Instance` impl for DFSDM2; no test hardware yet):
-    stm32h7a3zi, stm32h7b3zi — E0277 ×24, macros.rs:78
-  - pending bank-flag rerun (`build.rs:116` panics without one):
-    stm32f767zi, stm32l4p5zg, stm32l4q5zg, stm32l4r5zi, stm32l4s9zi
-  - stm32mp157: no feature in this crate's Cargo.toml yet — revisit after
-    the stm32-data regen (PLAN Phase 6)
-  - need stm32-data fixes first: stm32f777 (F7[67]), stm32l476 + stm32l452
-    (L4 regex), stm32l552 (header NS alias), stm32h7b0 (trigger H7(A|B))
-  - SD6–SD9 (dormant/minor/info) are non-blocking — excluded from the
-    regen-gate.
+  - passing (FT10, post-rebase): stm32h7a3zi, stm32h7b3zi, stm32h7b0ab —
+    previously E0277 ×24 (no `Instance` impl for DFSDM2)
+  - remaining bank-flag rerun (`build.rs:116` panics without one), now
+    unblocked by SD1–SD5 but not yet re-run: stm32f767zi, stm32l4p5zg,
+    stm32l4q5zg, stm32l4r5zi, stm32l4s9zi, stm32f777, stm32l476, stm32l452,
+    stm32l552
+  - stm32mp157: no feature in this crate's Cargo.toml yet — revisit later
+  - SD6/SD9 (dormant/info) are non-blocking — excluded from the regen-gate.
 - [ ] `cargo fmt` per repo config.
 - [ ] FT5 gate: the same matrix doubles as the gate for the optional
   TIM15/16/17 break impl.
@@ -648,9 +648,6 @@ Summary (each blocks DFSDM availability for whole chip groups):
     their respective overrun flags.
   - Accessors added: `regular_overrun()`, `injected_overrun()`, `clear_regular_overrun()`,
     `clear_injected_overrun()`, `set_regular_overrun_interrupt()`, `set_injected_overrun_interrupt()`.
-- [x] **FT1 — Overrun, propagated everywhere** (RM0455 §33.5, Table 254:
-  "data not read and overwritten by a new conversion"; JOVRF/ROVRF cleared via
-  ICR write-1, enabled by JOVRIE/ROVRIE). DONE (2026-01).
 - [X] **FT3 — `wait_for_sync()` / `synchronized()` on Transceiver** (replaces
   time-based "blanking"; RM0455 §33.4.4 Clock absence sequence): after
   `CHEN=1`, repeatedly write `CLRCKABF[y]` until `CKABF[y]` reads 0 — the flag
