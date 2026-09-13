@@ -6,7 +6,7 @@ use core::mem::MaybeUninit;
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_stm32::dfsdm::config_types::{
+use embassy_stm32::dfsdm::config::{
     CkoutDivider, DataRightShift, FilterOrder, FilterParameters, InternalSpiMode,
 };
 use embassy_stm32::dfsdm::{Detectors, FilterConfig, Flt0, ShortCircuitAssignment};
@@ -60,10 +60,6 @@ async fn main(_spawner: Spawner) {
     let p = embassy_stm32::init_primary(config, &SHARED_DATA);
     info!("Hello World!");
 
-    let mut ld1 = Output::new(p.PB0, Level::High, Speed::Low);
-    let mut ld2 = Output::new(p.PE1, Level::High, Speed::Low);
-    let mut ld3 = Output::new(p.PB14, Level::High, Speed::Low);
-
     // Setup mic as left channel, data is valid at clock low, to rising clock edge samples signal
     let _mic_sel = Output::new(p.PA3, Level::Low, Speed::Low);
 
@@ -74,7 +70,7 @@ async fn main(_spawner: Spawner) {
     let dfsdm1 = dfsdm::Dfsdm::new_ckout(
         p.DFSDM1,
         p.PC2,
-        dfsdm::config_types::CkoutSource::System,
+        dfsdm::config::CkoutSource::System,
         CkoutDivider::try_from(prescaler as u16).expect("Divider wrong?"),
     );
 

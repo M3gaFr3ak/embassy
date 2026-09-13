@@ -6,7 +6,7 @@ use core::mem::MaybeUninit;
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_stm32::dfsdm::config_types::{DataRightShift, FilterOrder, FilterParameters};
+use embassy_stm32::dfsdm::config::{DataRightShift, FilterOrder, FilterParameters};
 use embassy_stm32::dfsdm::{FilterConfig, Flt0};
 use embassy_stm32::dma::{self, Channel, Transfer, TransferOptions};
 use embassy_stm32::pac::dfsdm::regs::Rdatar;
@@ -73,7 +73,7 @@ async fn main(_spawner: Spawner) {
 
     let ch_test = split
         .ch0
-        .build_parallel_dma(&common, dfsdm::config_types::DataPackingModeReduced::Standard)
+        .build_parallel_dma(&common, dfsdm::config::DataPackingModeReduced::Standard)
         .set_data_right_shift(DataRightShift::new(0))
         .enable();
 

@@ -1,3 +1,6 @@
+//! DMA support: the ring-buffered regular-conversion filter that reads
+//! converted samples via DMA.
+
 use super::*;
 use crate::dma::ringbuffer::Error as DmaError;
 use crate::dma::{Channel, ReadableRingBuffer};

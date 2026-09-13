@@ -6,9 +6,7 @@ use core::mem::MaybeUninit;
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_stm32::dfsdm::config_types::{
-    CkoutDivider, DataRightShift, FilterOrder, FilterParameters, InternalSpiMode,
-};
+use embassy_stm32::dfsdm::config::{CkoutDivider, DataRightShift, FilterOrder, FilterParameters, InternalSpiMode};
 use embassy_stm32::dfsdm::{Detectors, FilterConfig, Flt0};
 use embassy_stm32::gpio::{Level, Output, Speed};
 use embassy_stm32::peripherals::DFSDM1;
@@ -60,10 +58,6 @@ async fn main(_spawner: Spawner) {
     let p = embassy_stm32::init_primary(config, &SHARED_DATA);
     info!("Hello World!");
 
-    let mut ld1 = Output::new(p.PB0, Level::High, Speed::Low);
-    let mut ld2 = Output::new(p.PE1, Level::High, Speed::Low);
-    let mut ld3 = Output::new(p.PB14, Level::High, Speed::Low);
-
     // Setup mic as left channel, data is valid at clock low, to rising clock edge samples signal
     let _mic_sel = Output::new(p.PA3, Level::Low, Speed::Low);
 
@@ -75,7 +69,7 @@ async fn main(_spawner: Spawner) {
     let dfsdm1 = dfsdm::Dfsdm::new_ckout(
         p.DFSDM1,
         p.PC2,
-        dfsdm::config_types::CkoutSource::System,
+        dfsdm::config::CkoutSource::System,
         CkoutDivider::try_from(prescaler as u16).expect("Divider wrong?"),
     );
     println!("Running with prescaler={}", prescaler);
@@ -99,12 +93,9 @@ async fn main(_spawner: Spawner) {
         .set_data_right_shift(DataRightShift::new(0))
         .enable();
 
-    let filter_params =
-        FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 100 }, 50).expect("This is inside the bounds");
-
     let flt_cfg = FilterConfig {
-        // filter_cfg: FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 5 }, 4).expect("This is inside the bounds"),
-        filter_params,
+        filter_params: FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 100 }, 50)
+            .expect("This is inside the bounds"),
         ..Default::default()
     };
 

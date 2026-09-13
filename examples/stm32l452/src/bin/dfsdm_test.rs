@@ -4,7 +4,7 @@
 /// This example demonstrates how to use the QSPI peripheral in both indirect-mode and memory-mapped mode.
 /// If you want to test this example, please pay attention to flash pins and check flash device datasheet
 /// to make sure operations in this example are compatible with your device, especially registers I/O operations.
-use embassy_stm32::dfsdm::config_types::{FilterOrder, FilterParameters};
+use embassy_stm32::dfsdm::config::{FilterOrder, FilterParameters};
 use embassy_stm32::dfsdm::{FilterConfig, Flt0, Flt1, InjectedTrigger};
 use embassy_stm32::peripherals::DFSDM1;
 use embassy_stm32::qspi::{self, Instance};
@@ -41,7 +41,7 @@ async fn main(_spawner: Spawner) {
 
     let channel_mic = split
         .ch0
-        .build_parallel_dma(&common, dfsdm::config_types::DataPackingModeReduced::Interleaved)
+        .build_parallel_dma(&common, dfsdm::config::DataPackingModeReduced::Interleaved)
         .enable();
 
     let filter_params =
@@ -50,13 +50,13 @@ async fn main(_spawner: Spawner) {
     let flt_cfg = FilterConfig {
         // filter_cfg: FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 5 }, 4).expect("This is inside the bounds"),
         filter_params,
-        trigger: InjectedTrigger::from(TIM1_TRGO, dfsdm::config_types::TriggerEdge::Any),
+        trigger: InjectedTrigger::from(TIM1_TRGO, dfsdm::config::TriggerEdge::Any),
         ..Default::default()
     };
     let flt_cfg2 = FilterConfig {
         // filter_cfg: FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 5 }, 4).expect("This is inside the bounds"),
         filter_params,
-        trigger: InjectedTrigger::from(TIM6_TRGO, dfsdm::config_types::TriggerEdge::Any),
+        trigger: InjectedTrigger::from(TIM6_TRGO, dfsdm::config::TriggerEdge::Any),
         ..Default::default()
     };
 

@@ -16,7 +16,7 @@
 use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_stm32::dfsdm::config_types::{FilterOrder, FilterParameters, TriggerEdge};
+use embassy_stm32::dfsdm::config::{FilterOrder, FilterParameters, TriggerEdge};
 use embassy_stm32::dfsdm::{FilterConfig, Flt0, Flt1, Flt2, Flt3, InjectedTrigger, TriggerSource};
 use embassy_stm32::peripherals::DFSDM1;
 use embassy_stm32::triggers::{TIM1_TRGO, TIM3_TRGO, TIM6_TRGO, TIM7_TRGO};
@@ -54,7 +54,7 @@ async fn main(_spawner: Spawner) {
     // exercises the per-filter JEXTSEL mapping, not the datapath).
     let channel = split
         .ch0
-        .build_parallel_dma(&common, dfsdm::config_types::DataPackingModeReduced::Interleaved)
+        .build_parallel_dma(&common, dfsdm::config::DataPackingModeReduced::Interleaved)
         .enable();
 
     let filter_params = FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 100 }, 50).unwrap();

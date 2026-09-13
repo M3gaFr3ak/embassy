@@ -5,7 +5,7 @@ use core::mem::MaybeUninit;
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_stm32::dfsdm::config_types::{CkoutDivider, FilterOrder, FilterParameters, InternalSpiMode};
+use embassy_stm32::dfsdm::config::{CkoutDivider, FilterOrder, FilterParameters, InternalSpiMode};
 use embassy_stm32::dfsdm::{FilterConfig, Flt0, ResultInjected};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
 use embassy_stm32::peripherals::DFSDM1;
@@ -89,7 +89,7 @@ async fn main(_spawner: Spawner) {
     let dfsdm1 = dfsdm::Dfsdm::new_ckout(
         p.DFSDM1,
         p.PC2,
-        dfsdm::config_types::CkoutSource::System,
+        dfsdm::config::CkoutSource::System,
         CkoutDivider::try_from(prescaler as u16).expect("Divider wrong?"),
     );
     println!("Running with prescaler={}", prescaler);
