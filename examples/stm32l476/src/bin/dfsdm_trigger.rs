@@ -6,7 +6,7 @@
 //! `DFSDM_8CH_4FLT_TRG3`).
 //!
 //! On 3-bit-JEXTSEL parts the `JTRGn` channel number is not the register
-//! value — each filter compacts a *different* subset of the trigger channels
+//! value - each filter compacts a *different* subset of the trigger channels
 //! into `0..7` (see `embassy-stm32/src/dfsdm/trigger_map.rs`). `Flt0`/`Flt1`
 //! share one set; `Flt2`/`Flt3` each diverge. This example assigns a distinct
 //! trigger per filter and logs the resolved `jextsel` value. Invalid

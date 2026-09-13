@@ -45,7 +45,9 @@ Absorbs D1–D13 + D14's doc clauses, FT8, FT15's doc clauses, NITS #3/#8.
 Every public item gets a real docstring; the missing_docs warnings are the
 inventory, so nothing is skipped. Formalize into rustdoc ([`Type`] links,
 §-refs where the TRM is load-bearing, `# Note`/`# Safety` rubrics; no em
-dashes), batched per module (types.rs, splits.rs, detector objects, read
+dashes). TRM content is restated, not copied verbatim: ASCII punctuation only
+(`->` not `→`, `x` not `×`, `<=` not `≤`); `§` is kept for section references
+only. Batched per module (types.rs, splits.rs, detector objects, read
 paths, dma.rs) with a missing_docs-per-module zero gate. The former D-register
 notes become the docstrings they annotate:
 
