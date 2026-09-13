@@ -4,6 +4,7 @@ use crate::dma::{Channel, ReadableRingBuffer};
 use crate::interrupt::typelevel::Binding;
 use crate::rcc::WakeGuard;
 
+/// A filter bound to a DMA ring buffer, for reading converted samples.
 pub struct RingBufferedFilter<'e, T, M, DM: DmaMode>
 where
     T: Instance + FilterInterrupt<M>,
@@ -20,6 +21,7 @@ where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
+    /// Attach a DMA ring buffer to this filter's regular-conversion data register.
     pub fn ring_buffered<'e, D: Dma<T, M>>(
         self: &'e mut Self,
         dma: Peri<'e, D>,
@@ -37,6 +39,7 @@ where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
+    /// Attach a DMA ring buffer to this filter's injected-conversion data register.
     pub fn ring_buffered<'e, D: Dma<T, M>>(
         self: &'e mut Self,
         dma: Peri<'e, D>,
@@ -49,7 +52,7 @@ where
         buf
     }
 
-    /// Returns number of assigned channels in channelgroup
+    /// Returns number of assigned transceivers in the injected group.
     fn popcnt(&self) -> usize {
         let bitmask = T::regs().flt(M::CHANNEL.index()).jchgr().read().jchg();
         bitmask.count_ones() as usize
@@ -90,39 +93,50 @@ where
         }
     }
 
-    //TODO docstring should mention that it just trigges the startconverison,
-    //meaning in injected one group OR scan, in regular one conversion OR continuous
-    //maybe duplicate function for both markers with different docs idk
+    /// Start a conversion. Regular conversions start one conversion (or
+    /// continuous, if enabled); injected conversions start one group (or a
+    /// scan, if enabled).
     pub fn start_conversion(&mut self) {
         self.filter.start_conversion();
     }
 
+    /// Start the DMA transfers. Does not start a conversion; call
+    /// [`start_conversion`](Self::start_conversion) separately.
     pub fn start(&mut self) {
         self.ring_buf.start();
     }
 
+    /// Pause the DMA transfers. Conversions are not stopped.
     pub fn stop(&mut self) {
         self.ring_buf.request_pause();
     }
 
+    /// Discard all buffered samples.
     pub fn clear(&mut self) {
         self.ring_buf.clear();
     }
 
+    /// Whether the DMA ring buffer is running.
     pub fn is_running(&mut self) -> bool {
         self.ring_buf.is_running()
     }
 
+    /// Number of samples the ring buffer can hold.
     pub fn capacity(&self) -> usize {
         self.ring_buf.capacity()
     }
 
+    /// Read the most recent samples, discarding older data. Never blocks;
+    /// returns the number of samples written into `buf`.
     pub fn read_latest(&mut self, buf: &mut [u32]) -> Result<usize, Error> {
         self.autostart()?;
 
         Ok(self.ring_buf.read_latest(buf))
     }
 
+    /// Asynchronously read `buf.len()` samples. `buf.len()` must equal half of
+    /// [`capacity`](Self::capacity), or this panics. Starts the DMA if needed;
+    /// returns [`Error::Overrun`] if the buffer overran.
     pub async fn read(&mut self, buf: &mut [u32]) -> Result<usize, Error> {
         assert_eq!(
             self.ring_buf.capacity() / 2,
@@ -135,6 +149,8 @@ where
         self.ring_buf.read_exact(buf).await.map_err(remap_dma_error)
     }
 
+    /// Blocking counterpart of [`read`](Self::read): spins until `buf.len()`
+    /// samples are available, with the same half-capacity requirement.
     pub fn blocking_read(&mut self, buf: &mut [u32]) -> Result<usize, Error> {
         assert_eq!(
             self.ring_buf.capacity() / 2,

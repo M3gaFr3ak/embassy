@@ -39,39 +39,30 @@ use crate::{Peri, interrupt, rcc};
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum Error {
-    //TODO
     /// Overrun error: the hardware generated data faster than we could read it.
     Overrun,
     /// Internal peripheral error.
     PeripheralError,
     /// Neighbor pin unavailable.
     NeighborPinUnavailable,
-    /// No data available yet
+    /// No data available yet.
     NotReady,
-}
-
-/// DFSDM configuration.
-#[non_exhaustive]
-pub struct Config {
-    //TODO
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {}
-    }
 }
 
 // =============================================================================
 // Pin Reference Counting Storage
 // =============================================================================
 
+/// Which of a transceiver's two pins a slot tracks.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PinKind {
+    /// Data-input pin.
     Datin,
+    /// Clock-input pin.
     Ckin,
 }
 
+/// Reference-counted storage for one pin of one transceiver.
 pub struct PinSlot<'d> {
     inner: critical_section::Mutex<RefCell<Option<Flex<'d>>>>,
     rc: AtomicU8,
@@ -90,7 +81,7 @@ impl<'d> PinSlot<'d> {
 // Entrypoint to creating a DFSDM driver instance.
 // =============================================================================
 
-/// DFSDM driver.
+/// DFSDM driver entry point.
 pub struct Dfsdm<'d, T: Instance, C: ClockOutputMode> {
     _instance_marker: PhantomData<T>,
     _clock_mode: PhantomData<C>,
@@ -117,7 +108,7 @@ impl<'d, T> Dfsdm<'d, T, OutputEnabled>
 where
     T: Instance,
 {
-    /// Configure DFSDM module with a clock output
+    /// Create the driver with an output clock on `ckout`.
     pub fn new_ckout(
         peri: Peri<'d, T>,
         ckout: Peri<'d, if_afio!(impl CkoutPin<T, A>)>,
@@ -150,7 +141,7 @@ impl<'d, T> Dfsdm<'d, T, OutputDisabled>
 where
     T: Instance,
 {
-    /// Configure DFSDM module without a clock output
+    /// Create the driver without an output clock.
     pub fn new(peri: Peri<'d, T>) -> Self {
         let mut dfsdm = Self::new_inner(peri, None);
 
@@ -178,12 +169,12 @@ where
         }
     }
 
-    // Set's the clock-output clock-divider
+    // Sets the clock-output clock-divider
     fn set_ckout_div(&mut self, divider: config_types::CkoutDivider) {
         T::regs().ch(0).cfgr1().modify(|w| w.set_ckoutdiv(divider.into()));
     }
 
-    /// Set's the clock-output clock-source
+    /// Sets the clock-output clock-source
     fn set_ckout_src(&mut self, source: config_types::CkoutSource) {
         T::regs().ch(0).cfgr1().modify(|w| w.set_ckoutsrc(source.into()));
     }
@@ -363,7 +354,7 @@ where
         }
     }
 
-    /// Enables the peripheral
+    /// Enables the peripheral.
     pub fn enable(self) -> DfsdmCommon<'d, T, Enabled> {
         T::regs().ch(0).cfgr1().modify(|w| w.set_dfsdmen(true));
         let (_peri, _ckout, datin_slots, ckin_slots) = self.into_raw_parts();
@@ -381,7 +372,7 @@ impl<'d, T> DfsdmCommon<'d, T, Enabled>
 where
     T: Instance,
 {
-    /// Disables the peripheral
+    /// Disables the peripheral.
     pub fn disable(self) -> DfsdmCommon<'d, T, Disabled> {
         T::regs().ch(0).cfgr1().modify(|w| w.set_dfsdmen(false));
 
@@ -400,13 +391,21 @@ where
 // FilterConfig
 // =============================================================================
 
-/// Configuration for Filter
+/// Configuration for a filter, applied on enable.
 pub struct FilterConfig<T: Instance, M: FilterMarker> {
+    /// Filter order, OSR and input width.
     pub filter_params: FilterParameters,
+    /// Run regular conversions continuously.
     pub enable_continuous_regular: bool,
+    /// Use fast mode for continuous regular conversions: the filter is not
+    /// refilled between conversions, so the OSR windows overlap and each
+    /// conversion after the first is faster.
     pub enable_fast_regular: bool,
+    /// Synchronize regular conversions to the clock.
     pub enable_regular_sync: bool,
+    /// Synchronize injected conversions to the clock.
     pub enable_injected_sync: bool,
+    /// Cycle injected conversions through the selected transceivers.
     pub enable_injected_scanning: bool,
 
     /// Configures the trigger for injected conversions.
@@ -439,6 +438,7 @@ fn sign_extend_24(x: u32) -> i32 {
 // Filter
 // =============================================================================
 
+/// A filter that is disabled (not yet enabled).
 pub struct FilterDisabled<'a, 'd, T, M>
 where
     T: Instance + FilterInterrupt<M>,
@@ -448,6 +448,8 @@ where
     common: &'a DfsdmCommon<'d, T, Enabled>,
 }
 
+/// An enabled filter, split into its regular, injected, watchdog and extremes
+/// parts.
 pub struct Filter<'tr, 'ti, 'a, 'd, T, M, D>
 where
     T: Instance + FilterInterrupt<M>,
@@ -455,12 +457,17 @@ where
     D: DmaMode,
 {
     common: &'a DfsdmCommon<'d, T, Enabled>,
+    /// Regular-conversion half.
     pub regular: FilterRegular<'a, 'd, 'tr, T, M, D>,
+    /// Injected-conversion half.
     pub injected: FilterInjected<'a, 'd, 'ti, T, M, D>,
+    /// Analog watchdog.
     pub awd: AnalogWatchdog<'a, 'd, T, M>,
+    /// Extremes detector.
     pub extremes: ExtremesDetector<'a, 'd, T, M>,
 }
 
+/// Regular-conversion half of a filter.
 pub struct FilterRegular<'a, 'd, 't, T, M, D>
 where
     T: Instance + FilterInterrupt<M>,
@@ -471,6 +478,7 @@ where
     regular: &'t dyn TransceiverTrait<T, Enabled>,
 }
 
+/// Injected-conversion half of a filter.
 pub struct FilterInjected<'a, 'd, 't, T, M, D>
 where
     T: Instance + FilterInterrupt<M>,
@@ -493,7 +501,7 @@ where
             common,
         }
     }
-    /// Activate filter with no DMA enabled.
+    /// Enable the filter without a DMA request flag.
     pub fn enable_no_dma<'tr, 'ti, const N: usize>(
         self,
         regular: &'tr dyn TransceiverTrait<T, Enabled>,
@@ -506,7 +514,7 @@ where
         self.enable_int(regular, injected, config)
     }
 
-    /// Activate Filter with DMA enabled for regular conversions
+    /// Enable the filter and set the regular-conversion DMA request flag (RDMAEN).
     pub fn enable_reg_dma<'tr, 'ti, const N: usize>(
         self,
         regular: &'tr dyn TransceiverTrait<T, Enabled>,
@@ -519,7 +527,7 @@ where
         self.enable_int(regular, injected, config)
     }
 
-    /// Activate Filter with DMA enabled for injected conversions
+    /// Enable the filter and set the injected-conversion DMA request flag (JDMAEN).
     pub fn enable_inj_dma<'tr, 'ti, const N: usize>(
         self,
         regular: &'tr dyn TransceiverTrait<T, Enabled>,
@@ -595,7 +603,7 @@ where
 
     /// Enables or disables continuous conversion mode.
     ///
-    /// When enabled, the regular channel is converted repeatedly after each
+    /// When enabled, the regular transceiver is converted repeatedly after each
     /// conversion request. Disabling it while a continuous conversion is in
     /// progress stops the conversion immediately.
     fn set_continuous(enabled: bool) {
@@ -633,12 +641,12 @@ where
 
     /// Enables or disables scanning mode for injected conversions.
     ///
-    /// When enabled, injected conversions cycle through all selected channels,
-    /// starting again at the lowest selected channel. When disabled, each
-    /// conversion advances to the next selected channel.
+    /// When enabled, injected conversions cycle through all selected transceivers,
+    /// starting again at the lowest selected transceiver. When disabled, each
+    /// conversion advances to the next selected transceiver.
     ///
-    /// Changing the injected channel group while scanning is disabled resets the
-    /// channel selection to the lowest selected channel.
+    /// Changing the injected transceiver group while scanning is disabled resets
+    /// the selection to the lowest selected transceiver.
     fn set_injected_scanning(enabled: bool) {
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_jscan(enabled));
     }
@@ -661,7 +669,7 @@ where
     M: FilterMarker + InstanceEvents<T>,
     D: DmaMode,
 {
-    /// Disable the Filter
+    /// Disable the filter.
     pub fn disable(self) -> FilterDisabled<'a, 'd, T, M> {
         FilterRegs::<T, M>::set_enabled(false);
 
@@ -755,14 +763,21 @@ where
     }
 }
 
+/// Regular conversion result.
 pub struct ResultRegular {
+    /// Sign-extended 24-bit sample.
     pub data: i32,
+    /// Transceiver the sample came from.
     pub channel: u8,
+    /// Set if the conversion was delayed by an injected conversion.
     pub pending: bool,
 }
 
+/// Injected conversion result.
 pub struct ResultInjected {
+    /// Sign-extended 24-bit sample.
     pub data: i32,
+    /// Transceiver the sample came from.
     pub channel: u8,
 }
 
@@ -799,12 +814,12 @@ where
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_rch(ch as u8));
     }
 
-    /// Trigger a regular conversion
+    /// Start a regular conversion.
     pub fn start_conversion(&mut self) {
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_rswstart(true));
     }
 
-    /// Trigger a regular conversion and read it asynchronously using interrupts
+    /// Start a regular conversion and read its result asynchronously.
     pub async fn read(&mut self) -> Result<ResultRegular, Error> {
         self.start_conversion();
 
@@ -872,10 +887,12 @@ where
         FilterRegs::<T, M>::end_of_regular_conversion()
     }
 
+    /// Whether the regular overrun flag is set.
     pub fn overrun(&self) -> bool {
         FilterRegs::<T, M>::regular_overrun()
     }
 
+    /// Clear the regular overrun flag.
     pub fn clear_overrun(&self) {
         FilterRegs::<T, M>::clear_regular_overrun();
     }
@@ -887,7 +904,7 @@ where
 
     /// Enables or disables continuous conversion mode.
     ///
-    /// When enabled, the regular channel is converted repeatedly after each
+    /// When enabled, the regular transceiver is converted repeatedly after each
     /// conversion request. Disabling it while a continuous conversion is in
     /// progress stops the conversion immediately.
     pub fn set_continuous(&mut self, enabled: bool) {
@@ -978,12 +995,12 @@ where
             .write(|w| w.set_jchg(channels));
     }
 
-    /// Trigger a injected conversion
+    /// Start an injected conversion.
     pub fn start_conversion(&mut self) {
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_jswstart(true));
     }
 
-    /// Trigger a injected conversion and read it asynchronously using interrupts
+    /// Start an injected conversion and read its result asynchronously.
     pub async fn read(&mut self) -> Result<ResultInjected, Error> {
         self.start_conversion();
 
@@ -1045,10 +1062,12 @@ where
         FilterRegs::<T, M>::end_of_injected_conversion()
     }
 
+    /// Whether the injected overrun flag is set.
     pub fn overrun(&self) -> bool {
         FilterRegs::<T, M>::injected_overrun()
     }
 
+    /// Clear the injected overrun flag.
     pub fn clear_overrun(&self) {
         FilterRegs::<T, M>::clear_injected_overun()
     }
@@ -1271,7 +1290,7 @@ where
     MODE: ChannelMode,
     PS: PinSource,
 {
-    /// Disables the channel
+    /// Disables the transceiver.
     pub fn disable(self) -> Transceiver<'a, 'd, T, M, S, MODE, PS, Disabled> {
         Self::set_enabled(false);
 
@@ -1297,6 +1316,8 @@ where
     MODE: ChannelMode + ExternalSerialMode,
     PS: PinSource,
 {
+    /// Wait until this transceiver's clock-absence flag clears, indicating it
+    /// is synchronized. Only meaningful for externally-clocked serial modes.
     pub async fn wait_for_sync(&mut self) {
         loop {
             if ClockAbsenceDetector::<T>::try_clear_channel_flag(M::CHANNEL) {
@@ -1324,7 +1345,7 @@ where
     MODE: ChannelMode,
     PS: PinSource,
 {
-    /// Enables the channel
+    /// Enables the transceiver.
     pub fn enable(self) -> Transceiver<'a, 'd, T, M, S, MODE, PS, Enabled> {
         Self::set_enabled(true);
 
@@ -1342,7 +1363,7 @@ where
         }
     }
 
-    /// Set channel right shift factor
+    /// Set the transceiver's right-shift factor.
     pub fn set_data_right_shift(self, shift: config_types::DataRightShift) -> Self {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -1351,7 +1372,7 @@ where
         self
     }
 
-    /// Set the filterorder of the analog watchdog
+    /// Set the analog watchdog filter's order.
     pub fn select_awd_filter_order(self, filter_order: config_types::AwdFilterOrder) -> Self {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -1360,7 +1381,7 @@ where
         self
     }
 
-    /// Set the oversampling ratio of the analog watchdog filter
+    /// Set the analog watchdog filter's OSR.
     pub fn select_awd_filter_osr(self, osr: config_types::AwdFilterOsr) -> Self {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -1411,7 +1432,7 @@ where
         T::regs().ch(M::CHANNEL.index()).cfgr1().modify(|w| w.set_chen(enabled));
     }
 
-    /// Set channel offset
+    /// Set the transceiver's offset.
     pub fn set_offset(&mut self, offset: u32) {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -1419,10 +1440,8 @@ where
             .modify(|w| w.set_offset(offset));
     }
 
-    /// Read input channel watchdog data.
-    /// Data converted by the analog watchdog filter for input channel y.
-    /// This data is continuously converted (no trigger) for this channel,
-    /// with a limited resolution (OSR=1..32/sinc order = 1..3).
+    /// Read the analog watchdog data for this transceiver, converted by the
+    /// watchdog filter (continuously, with limited resolution).
     pub fn awd_filter_data(&self) -> u16 {
         T::regs().ch(M::CHANNEL.index()).wdatr().read().wdata()
     }
@@ -1515,7 +1534,7 @@ where
 // Builders
 // ============================================================
 
-/// Used to build a [`Detector`].
+/// Builds the [`Detectors`] pair.
 pub struct DetectorsBuilder<T>
 where
     T: Instance + FilterInterrupt<Flt0>,
@@ -1638,7 +1657,7 @@ where
     }
 
     /// Parallel input from ADC writes to CHyDATINR (DATMPX=1).
-    /// No CKOUT, no pins needed. Serial pins declared on this channel
+    /// No CKOUT, no pins needed. Serial pins declared on this transceiver
     /// are disconnected (the builder's Flexes drop here - they're unused
     /// in this mode).
     pub fn build_parallel_adc<'a, 'd>(
@@ -1662,7 +1681,7 @@ where
     }
 
     /// Parallel input from CPU/DMA writes to CHyDATINR (DATMPX=2).
-    /// No CKOUT, no pins needed. Serial pins declared on this channel
+    /// No CKOUT, no pins needed. Serial pins declared on this transceiver
     /// are disconnected (the builder's Flexes drop here - they're unused
     /// in this mode).
     pub fn build_parallel_dma<'a, 'd>(
@@ -1684,11 +1703,11 @@ where
         }
     }
 
-    /// Create dualmode DMA
+    /// Create a dual-mode DMA pair.
     ///
-    /// Returns transceivers for channel `M` (even, owns DATINR) and `MN` (odd,
-    /// reads INDAT1 from M's DATINR). Two filters must be configured - one
-    /// assigned to `M` (reads INDAT0, the lower word) and one to `MN`
+    /// Returns transceivers for transceiver `M` (even, owns DATINR) and `MN`
+    /// (odd, reads INDAT1 from M's DATINR). Two filters must be configured -
+    /// one assigned to `M` (reads INDAT0, the lower word) and one to `MN`
     /// (reads INDAT1, the upper word) - or the register won't drain and
     /// you'll get overrun errors.
     pub fn build_parallel_dma_dual<'a, 'd, MN, SNN>(
@@ -1732,7 +1751,7 @@ where
         )
     }
 
-    /// Manchester-coded input over this channel's own DATIN pin (SITP = 2/3,
+    /// Manchester-coded input over this transceiver's own DATIN pin (SITP = 2/3,
     /// DATMPX = 0). The clock is recovered from the data line, so CKOUT/CKIN
     /// are not needed; the declared DATIN pin carries data *and* clock.
     /// `mode` chooses the Manchester polarity (rising edge = 0 or 1).
@@ -1758,7 +1777,7 @@ where
         }
     }
 
-    ///Same as [`Self::build_manchester`] but using neighbors pins
+    /// Same as [`Self::build_manchester`], but using the neighbor's pins.
     pub fn build_manchester_neighbor<'a, 'd>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,
@@ -1784,7 +1803,7 @@ where
         })
     }
 
-    /// SPI input over this channel's own pins (DATMPX=0, SPICKSEL=0): sampling
+    /// SPI input over this transceiver's own pins (DATMPX=0, SPICKSEL=0): sampling
     /// clock comes from the *external* CKIN pin; requires a `DataClk` pinset
     /// (both lines). `mode` chooses rising/falling-edge sampling (SITP 0/1).
     pub fn build_spi_ext<'a, 'd>(
@@ -1810,7 +1829,7 @@ where
         }
     }
 
-    ///Same as [`Self::build_spi_ext`] but using neighbors pins
+    /// Same as [`Self::build_spi_ext`], but using the neighbor's pins.
     pub fn build_spi_ext_neighbor<'a, 'd>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,
@@ -1891,7 +1910,7 @@ where
     S: PinSet,
     SN: PinSet,
 {
-    /// SPI input over this channel's own DATIN pin (DATMPX=0), clock supplied
+    /// SPI input over this transceiver's own DATIN pin (DATMPX=0), clock supplied
     /// by our own CKOUT - only meaningful with `OutputEnabled`
     /// (`InternalSpiMode` picks rising/falling or the half-rate edges).
     pub fn build_spi_int<'a, 'd>(
@@ -1917,7 +1936,7 @@ where
         }
     }
 
-    ///Same as [`Self::build_spi_int`] but using neighbors pins
+    /// Same as [`Self::build_spi_int`], but using the neighbor's pins.
     pub fn build_spi_int_neighbor<'a, 'd>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,
@@ -1949,11 +1968,18 @@ where
 // Interrupt/Event accessors filter
 // ============================================================
 
+/// Analog watchdog configuration.
 pub struct AnalogWatchdogConfig {
+    /// Compare against the analog watchdog filter's output instead of the main
+    /// filter output (AWFSEL).
     pub fastmode: bool,
+    /// Break signals armed on the low threshold.
     pub low_break_signals: config_types::BreakSignals,
+    /// Break signals armed on the high threshold.
     pub high_break_signals: config_types::BreakSignals,
+    /// Low threshold.
     pub low_threshold: i32,
+    /// High threshold.
     pub high_threshold: i32,
 }
 
@@ -1969,20 +1995,28 @@ impl Default for AnalogWatchdogConfig {
     }
 }
 
-//TODO DOCSTRINGS, BITMAP TYPE, SPLIT
+/// Analog watchdog event.
 pub enum AnalogWatchdogEvent {
-    /// AnalogWatchdog high threshold trigerred.
-    HighThreshold { transceivers: u8 },
-    /// AnalogWatchdog low threshold trigerred.
-    LowThreshold { transceivers: u8 },
+    /// High threshold exceeded
+    HighThreshold {
+        /// bitmap of triggering transceivers.
+        transceivers: u8,
+    },
+    /// Low threshold exceeded
+    LowThreshold {
+        /// bitmap of triggering transceivers.
+        transceivers: u8,
+    },
 }
+/// Analog watchdog of a filter.
 pub struct AnalogWatchdog<'a, 'd, T, M>
 where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
     _instance_marker: PhantomData<(T, M)>,
-    common: &'a DfsdmCommon<'d, T, Enabled>,
+    /// Keeps the [`DfsdmCommon`] borrow alive for `'a`.
+    _common: PhantomData<&'a DfsdmCommon<'d, T, Enabled>>,
 }
 
 impl<'a, 'd, T, M> AnalogWatchdog<'a, 'd, T, M>
@@ -1990,17 +2024,17 @@ where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
-    pub(crate) fn new(common: &'a DfsdmCommon<'d, T, Enabled>) -> Self {
+    pub(crate) fn new(_common: &'a DfsdmCommon<'d, T, Enabled>) -> Self {
         let mut new = Self {
             _instance_marker: PhantomData,
-            common,
+            _common: PhantomData,
         };
 
         new.configure(AnalogWatchdogConfig::default());
         new
     }
 
-    /// Wait for a analog watchdog event
+    /// Wait for an analog watchdog event.
     pub async fn wait_for_event(&mut self) -> AnalogWatchdogEvent {
         poll_fn(|cx| {
             Self::set_interrupt_enable(false);
@@ -2024,6 +2058,7 @@ where
         .await
     }
 
+    /// Apply a full configuration.
     pub fn configure(&mut self, config: AnalogWatchdogConfig) {
         self.enable_analog_watchdog_fastmode(config.fastmode);
         self.assign_low_to_break_signals(config.low_break_signals);
@@ -2032,6 +2067,7 @@ where
         self.set_high_threshold(config.high_threshold);
     }
 
+    /// Set the high threshold.
     pub fn set_high_threshold(&mut self, threshold: i32) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -2039,6 +2075,7 @@ where
             .modify(|w| w.set_awht(threshold as u32));
     }
 
+    /// Set the low threshold.
     pub fn set_low_threshold(&mut self, threshold: i32) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -2046,6 +2083,7 @@ where
             .modify(|w| w.set_awlt(threshold as u32));
     }
 
+    /// Assign break signals to fire on the high threshold.
     pub fn assign_high_to_break_signals(&mut self, break_signals: config_types::BreakSignals) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -2053,6 +2091,7 @@ where
             .modify(|w| w.set_bkawh(break_signals.bits()));
     }
 
+    /// Assign break signals to fire on the low threshold.
     pub fn assign_low_to_break_signals(&mut self, break_signals: config_types::BreakSignals) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -2060,6 +2099,7 @@ where
             .modify(|w| w.set_bkawl(break_signals.bits()));
     }
 
+    /// Enable or disable the watchdog filter as the comparison source (AWFSEL).
     pub fn enable_analog_watchdog_fastmode(&mut self, enabled: bool) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -2070,7 +2110,7 @@ where
     /// Assign provided transceivers to this analog watchdog
     pub fn assign_transceivers<const N: usize>(
         &mut self,
-        // No borrow lifetime here as watchdog events arent awaited when channel is off.
+        // No borrow lifetime here as watchdog events are not awaited when the transceiver is off.
         // They're "errors", not results that waiting for might stall your program.
         transceivers: [&dyn TransceiverTrait<T, Enabled>; N],
     ) where
@@ -2087,34 +2127,42 @@ where
         });
     }
 
+    /// Whether the low-threshold flag is set for `channel`.
     pub fn channel_flag_low(&self, channel: TransceiverChannel) -> bool {
         self.flags_low().get_bit(channel.index() as usize)
     }
 
+    /// Whether the high-threshold flag is set for `channel`.
     pub fn channel_flag_high(&self, channel: TransceiverChannel) -> bool {
         self.flags_high().get_bit(channel.index() as usize)
     }
 
+    /// Low-threshold flag bitmap.
     pub fn flags_low(&self) -> u8 {
         Self::low_channels()
     }
 
+    /// High-threshold flag bitmap.
     pub fn flags_high(&self) -> u8 {
         Self::high_channels()
     }
 
+    /// Clear the low-threshold flag for `channel`.
     pub fn clear_channel_flags_low(&mut self, channel: TransceiverChannel) {
         Self::clear_low(1 << channel.index());
     }
 
+    /// Clear the high-threshold flag for `channel`.
     pub fn clear_channel_flags_high(&mut self, channel: TransceiverChannel) {
         Self::clear_high(1 << channel.index());
     }
 
+    /// Clear all low-threshold flags.
     pub fn clear_flags_low(&mut self) {
         Self::clear_low(0xFF);
     }
 
+    /// Clear all high-threshold flags.
     pub fn clear_flags_high(&mut self) {
         Self::clear_high(0xFF);
     }
@@ -2159,11 +2207,15 @@ where
     }
 }
 
+/// Extremes result.
 pub struct ResultExtreme {
+    /// Sign-extended 24-bit extreme value.
     pub data: i32,
+    /// Transceiver it came from.
     pub channel: u8,
 }
 
+/// Extremes (min/max) detector of a filter.
 pub struct ExtremesDetector<'a, 'd, T, M>
 where
     T: Instance,
@@ -2184,7 +2236,7 @@ where
     /// Assign provided transceivers to this extremes detector
     pub fn assign_transceivers<const N: usize>(
         &mut self,
-        // No borrow lifetime here as watchdog events arent awaited when channel is off.
+        // No borrow lifetime here as watchdog events are not awaited when the transceiver is off.
         // They're "errors", not results that waiting for might stall your program.
         transceivers: [&dyn TransceiverTrait<T, Enabled>; N],
     ) where
@@ -2226,11 +2278,14 @@ where
 // Interrupt/Event accessors instance
 // ============================================================
 
+/// Instance-level detectors.
 pub struct Detectors<'a, 'd, T>
 where
     T: Instance + FilterInterrupt<Flt0>,
 {
+    /// Short-circuit detector.
     pub short_circuit: ShortCircuitDetector<'a, 'd, T>,
+    /// Clock-absence detector.
     pub clock_absence: ClockAbsenceDetector<'a, 'd, T>,
 }
 
@@ -2255,15 +2310,20 @@ pub struct ShortCircuitAssignment<'t, T: Instance> {
 }
 
 impl<'t, T: Instance> ShortCircuitAssignment<'t, T> {
+    /// Create an assignment: a transceiver and its short-circuit threshold.
     pub const fn new(transceiver: &'t dyn TransceiverTrait<T, Enabled>, threshold: u8) -> Self {
         Self { transceiver, threshold }
     }
 }
 
+/// Short-circuit detector: flags when a transceiver's input stays constant
+/// (consecutive identical bits) for longer than the threshold, indicating a
+/// stuck or short-circuited input.
 pub struct ShortCircuitDetector<'a, 'd, T>
 where
     T: Instance,
 {
+    /// Keeps the [`DfsdmCommon`] borrow alive for `'a`.
     _common: PhantomData<&'a DfsdmCommon<'d, T, Enabled>>,
 }
 
@@ -2331,7 +2391,7 @@ where
             .modify(|w| w.set_bkscd(signals.bits()));
     }
 
-    /// Set short-circuit-detector-threshold for transceiver
+    /// Set the short-circuit threshold for a transceiver.
     pub fn set_threshold(&mut self, transceiver: &dyn TransceiverTrait<T, Enabled>, threshold: u8) {
         T::regs()
             .ch(transceiver.index())
@@ -2339,14 +2399,17 @@ where
             .modify(|w| w.set_scdt(threshold));
     }
 
+    /// Whether the short-circuit flag is set for `channel`.
     pub fn channel_flag(&self, channel: TransceiverChannel) -> bool {
         self.flags().get_bit(channel.index() as usize)
     }
 
+    /// Clear the short-circuit flag for `channel`.
     pub fn clear_channel_flags(&mut self, channel: TransceiverChannel) {
         Self::clear_channels(1 << channel.index());
     }
 
+    /// Short-circuit flag bitmap.
     pub fn flags(&self) -> u8 {
         Self::channel_flags_masked()
     }
@@ -2409,10 +2472,12 @@ where
     }
 }
 
+/// Clock-absence detector.
 pub struct ClockAbsenceDetector<'a, 'd, T>
 where
     T: Instance,
 {
+    /// Keeps the [`DfsdmCommon`] borrow alive for `'a`.
     _common: PhantomData<&'a DfsdmCommon<'d, T, Enabled>>,
 }
 
@@ -2464,14 +2529,17 @@ where
         Self::set_channels(Self::channel_word() & !filterword_of(&transceivers));
     }
 
+    /// Whether the clock-absence flag is set for `channel`.
     pub fn channel_flag(&self, channel: TransceiverChannel) -> bool {
         self.flags().get_bit(channel.index() as usize)
     }
 
+    /// Clear the clock-absence flag for `channel`.
     pub fn clear_channel_flags(&mut self, channel: TransceiverChannel) {
         Self::clear_channels(1 << channel.index());
     }
 
+    /// Clock-absence flag bitmap.
     pub fn flags(&self) -> u8 {
         Self::channel_flags_masked()
     }
@@ -2559,10 +2627,10 @@ pub(crate) const fn channel_count_mask<T: Instance>() -> u8 {
 // Single-use selectors
 // ============================================================
 
-/// Per-channel pin selector. Cannot be constructed outside this module
+/// Per-transceiver pin selector. Cannot be constructed outside this module
 /// (private field); handed out only inside the `configure_pins` closure,
-/// one per channel, **by value**. Every method consumes `self`, so each
-/// channel's pins can be declared exactly once (E0382 otherwise).
+/// one per transceiver, **by value**. Every method consumes `self`, so each
+/// transceiver's pins can be declared exactly once (E0382 otherwise).
 pub struct Sel<T: Instance, M: TransceiverMarker> {
     _m: PhantomData<(T, M)>,
 }
@@ -2582,7 +2650,7 @@ where
     T: Instance,
     M: TransceiverMarker,
 {
-    /// Declare this channel with a DATIN pin (AF set here).
+    /// Declare this transceiver with a DATIN pin (AF set here).
     pub fn datin(self, datin: Peri<'d, if_afio!(impl DatinPin<T, M, A>)>) -> DatinCfg<'d, T, M> {
         DatinCfg {
             datin: new_pin!(datin, AfType::input(Pull::None)).unwrap(),
@@ -2590,7 +2658,7 @@ where
         }
     }
 
-    /// Declare this channel with DATIN + CKIN.
+    /// Declare this transceiver with DATIN + CKIN.
     pub fn datin_ckin(
         self,
         datin: Peri<'d, if_afio!(impl DatinPin<T, M, A>)>,
@@ -2603,7 +2671,7 @@ where
         }
     }
 
-    /// Declare this channel as pinless (same as [`NoPinsCfg`]).
+    /// Declare this transceiver as pinless (same as [`NoPinsCfg`]).
     pub fn none(self) -> NoPinsCfg {
         NoPinsCfg
     }
@@ -2614,10 +2682,11 @@ where
     T: Instance,
     C: ClockOutputMode,
 {
-    /// The closure receives one selector per channel the instance actually has,
-    /// and must return one token per channel, as a tuple in the same order.
+    /// The closure receives one selector per transceiver the instance actually
+    /// has, and must return one token per transceiver, as a tuple in the same
+    /// order.
     ///
-    /// // DFSDM instance with 8-channel capabiltiy:
+    /// // DFSDM instance with 8-transceiver capability:
     /// ```
     /// dfsdm1.configure_pins(|tb| {
     ///     (
@@ -2633,7 +2702,7 @@ where
     /// });
     /// ```
     ///
-    /// // DFSDM instance with 2-channel capabiltiy:
+    /// // DFSDM instance with 2-transceiver capability:
     /// ```
     /// dfsdm1.configure_pins(|tb| {
     ///     (

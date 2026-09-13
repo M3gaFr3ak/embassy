@@ -1,7 +1,7 @@
 use super::types::*;
 
 // =============================================================================
-// Associate pin traits with channels
+// Associate pin traits with transceivers
 // =============================================================================
 
 macro_rules! impl_ckin_bridge {

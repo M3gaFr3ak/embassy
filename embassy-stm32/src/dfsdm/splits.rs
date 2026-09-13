@@ -11,7 +11,7 @@ use super::*;
 
 /// Builds the actual split struct from already-extracted pin pairs.
 pub trait Tcv2SplitBuild<T: Instance, C: ClockOutputMode, S0: PinSet, S1: PinSet> {
-    /// The split struct for this (channel, filter) shape.
+    /// The split struct for this (transceiver, filter) shape.
     type Out;
 
     /// Registers the pins with `common` and constructs the split.
@@ -22,9 +22,9 @@ pub trait Tcv2SplitBuild<T: Instance, C: ClockOutputMode, S0: PinSet, S1: PinSet
     ) -> Self::Out;
 }
 
-/// 4-channel twin of [`Tcv2SplitBuild`].
+/// 4-transceiver twin of [`Tcv2SplitBuild`].
 pub trait Tcv4SplitBuild<T: Instance, C: ClockOutputMode, S0: PinSet, S1: PinSet, S2: PinSet, S3: PinSet> {
-    /// The split struct for this (channel, filter) shape.
+    /// The split struct for this (transceiver, filter) shape.
     type Out;
 
     /// Registers the pins with `common` and constructs the split.
@@ -37,7 +37,7 @@ pub trait Tcv4SplitBuild<T: Instance, C: ClockOutputMode, S0: PinSet, S1: PinSet
     ) -> Self::Out;
 }
 
-/// 8-channel twin of [`Tcv2SplitBuild`].
+/// 8-transceiver twin of [`Tcv2SplitBuild`].
 pub trait Tcv8SplitBuild<
     T: Instance,
     C: ClockOutputMode,
@@ -51,7 +51,7 @@ pub trait Tcv8SplitBuild<
     S7: PinSet,
 >
 {
-    /// The split struct for this (channel, filter) shape.
+    /// The split struct for this (transceiver, filter) shape.
     type Out;
 
     /// Registers the pins with `common` and constructs the split.
@@ -73,17 +73,17 @@ pub trait Tcv8SplitBuild<
 // =============================================================================
 
 /// Implemented for the tuple a `configure_pins` closure returns.
-/// The arity *is* the channel-count check: `(C0, C1)` only impls for
+/// The arity *is* the transceiver-count check: `(C0, C1)` only impls for
 /// `Tcv2` instances, the 8-tuple only for `Tcv8`.
 #[diagnostic::on_unimplemented(
-    message = "the closure must return one pin token per channel of `{T}`",
+    message = "the closure must return one pin token per transceiver of `{T}`",
     label = "tuple length doesn't match `{T}`'s transceiver count",
-    note = "check `{T}`'s channel count and return a tuple of that length, one token per `creator.chN`"
+    note = "check `{T}`'s transceiver count and return a tuple of that length, one token per `creator.chN`"
 )]
 pub trait ChannelCfgTuple<'d, T: Instance, C: ClockOutputMode> {
     /// The fully-wired split (neighbor pin-sets already correct).
     type Split;
 
-    /// Split helper-function
+    /// Consumes the tuple and builds the split.
     fn split_parts(self, common: &mut DfsdmCommon<'d, T, Enabled>) -> Self::Split;
 }

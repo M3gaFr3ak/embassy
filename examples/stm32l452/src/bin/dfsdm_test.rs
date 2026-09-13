@@ -4,18 +4,12 @@
 /// This example demonstrates how to use the QSPI peripheral in both indirect-mode and memory-mapped mode.
 /// If you want to test this example, please pay attention to flash pins and check flash device datasheet
 /// to make sure operations in this example are compatible with your device, especially registers I/O operations.
-use defmt::info;
 use embassy_stm32::dfsdm::config_types::{FilterOrder, FilterParameters};
 use embassy_stm32::dfsdm::{FilterConfig, Flt0, Flt1, InjectedTrigger};
-use embassy_stm32::gpio::{Level, Output, Speed};
 use embassy_stm32::peripherals::DFSDM1;
-use embassy_stm32::qspi::enums::{
-    AddressSize, ChipSelectHighTime, DummyCycles, FIFOThresholdLevel, MemorySize, QspiWidth, SampleShifting,
-};
-use embassy_stm32::qspi::{self, Instance, TransferConfig};
-use embassy_stm32::time::Hertz;
+use embassy_stm32::qspi::{self, Instance};
 use embassy_stm32::triggers::{TIM1_TRGO, TIM6_TRGO};
-use embassy_stm32::{bind_interrupts, dfsdm, dma, mode, peripherals, rcc};
+use embassy_stm32::{bind_interrupts, dfsdm, mode};
 pub struct FlashMemory<I: Instance> {
     qspi: qspi::Qspi<'static, I, mode::Async>,
 }
@@ -32,12 +26,6 @@ bind_interrupts!(struct Irqs {
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let p = embassy_stm32::init(Default::default());
-
-    // Setup mic as left channel, data is valid at clock low, to rising clock edge samples signal
-    let _mic_sel = Output::new(p.PA3, Level::Low, Speed::Low);
-
-    let mic_clk_freq = Hertz::mhz(2);
-    let prescaler = rcc::frequency::<DFSDM1>() / mic_clk_freq;
 
     // Start driver instantiation using DFSDM1 with a CKOUT pin on pin C2
     let dfsdm1 = dfsdm::Dfsdm::new(p.DFSDM1);

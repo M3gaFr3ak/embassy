@@ -1,5 +1,3 @@
-use core::sync::atomic::AtomicU32;
-
 use super::*;
 
 // =============================================================================
@@ -1107,7 +1105,7 @@ pub mod config_types {
         }
 
         /// No shift (register value 0).
-        pub(crate) const NONE: Self = Self(0);
+        pub const NONE: Self = Self(0);
 
         /// Raw register value.
         pub const fn raw(self) -> u8 {
