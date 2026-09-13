@@ -650,3 +650,20 @@ Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
   its removal into FT22) and `use core::sync::atomic::AtomicU32` at types.rs:1
   unused (only `AtomicU8`/`AtomicWaker` are used).
 
+- [x] **FT22 — derive instance capabilities from the block name.** Instance
+  capabilities are now derived by string-matching `regs.block` at build time
+  instead of the `mark_dfsdm_instances!`/`impl_dfsdm_instance!` table:
+  - `codegen.rs` `parse(block)` parses the closed grammar
+    `DFSDM_{2,4,8}CH_{1,2,4,6,8}FLT[_DLY]_TRG{3,5}[_ADC][_HWID]` into a
+    `Shape { ch, flt, dly, hwid, adc }`; `gen_instance(inst, block)` emits
+    `impl SealedInstance` + `impl Instance` + `HasDelay`/`HasHwid`/`AdcInput`
+    from it. `mark_dfsdm_instances!` + `impl_dfsdm_instance!` deleted.
+  - `Instance::Repr` deleted (declared + assigned, never read; the driver only
+    touches `DfsdmSuperset`).
+  - Interrupt binding is count-agnostic: `foreach_interrupt!` unconditionally
+    binds `Flt0..Flt7` (each arm matching only the `FLTx` rows the chip has),
+    `dfsdm_flt_irqs!` removed.
+  - Neighbor ring unchanged (`impl_next_channel!` + the splits.rs S-pairing,
+    once-per-arity modulo-N).
+
+

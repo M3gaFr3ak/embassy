@@ -5,39 +5,22 @@ Closed work lives in `done.md`.
 
 ## Triage
 
-1. **P1 — substantive.** FT22 (build.rs capability derivation), T-doc
-   (D-clause docstring semantics). These are the two items with real scope.
-2. **P2 — verification & examples.** Clippy/mp157 on the matrix, the five
-   example gaps, the FT5 (TIM15/16/17) gate.
+1. **P1 — substantive.** T-doc (D-clause docstring semantics).
+2. **P2 — verification & examples.** mp157 on the matrix, the five example
+   gaps, the FT5 (TIM15/16/17) gate.
 3. **P3 — optional / reflect.** NITS reflect & hardening notes, FT19/FT9
    (cosmetic helpers), housekeeping.
 4. **Dormant / info (stm32-data).** SD6, SD9, timer-break research.
 
 ---
 
+## Notes acute:
+### Interrupts (F7 DFSDM interrupt data gap):
+- F7 (F767/F777/F778/F779) DFSDM1 is registered as a peripheral but has no interrupt signals in stm32-data — foreach_interrupt! emits zero DFSDM rows, so impl_dfsdm_filter_irq! never expands (unused_macros under -D warnings) and no FilterInterrupt impls exist on F7. Add the DFSDM1_FLT0..FLT7 (per-filter) interrupt declarations to the F7 DFSDM1 block so interrupt/async DFSDM works there; then F7 drops off the unused_macros list.
+### FT5 gate (break-enable caveats):
+- Document the FT5 break-enable caveats in code (timer/low_level.rs, cross-ref'd from complementary_pwm.rs): on F4/F7 the AF1/AF2 DFSDM break bits aren't in the TRMs (RM0402/RM0430/RM0410) so set_break_dfsdm_enable (F4) and set_break2_dfsdm_enable (F4 + F7) are unverified on silicon; plus note the DFSDM source side (ShortCircuitDetector::assign_break_signals / AWD BreakSignals). TIM15/16/17 break remains unimplemented (tracked here, not code).
+
 ## P1 — substantive
-
-### FT22 — derive instance capabilities from the block name
-
-String-match `regs.block` in build.rs instead of the `mark_dfsdm_instances!`
-table. The 13 DFSDM block names form a closed grammar
-`DFSDM_{2,4,8}CH_{1,2,4,6,8}FLT[_DLY]_TRG{3,5}[_ADC][_HWID]`, and build.rs
-already holds `regs.block`. Plan:
-
-- build.rs string-matches `regs.block` → `Transceivers`/`Filters`/`HasDelay`/
-  `HasHwid`/`AdcInput`, then emits `impl SealedInstance` + `impl Instance` +
-  capability flags directly (drops `mark_dfsdm_instances!` +
-  `impl_dfsdm_instance!`).
-- Drop `Instance::Repr` (dead: declared + assigned, never read; the driver
-  only touches `DfsdmSuperset`).
-- **Interrupts stay in `foreach_interrupt!`**: make the IRQ binding
-  count-agnostic by unconditionally binding `Flt0..Flt7` (each
-  `foreach_interrupt!` arm matches only the `FLTx` rows the chip actually has),
-  removing `dfsdm_flt_irqs!` and the filter-count dependency from the
-  interrupt side.
-- **Neighbor ring stays** (`impl_next_channel!` + the splits.rs S-pairing):
-  chip-independent modulo-N successor, already once-per-arity, no string to
-  match — not a capability table, out of scope here.
 
 ### T-doc — full docstring pass (D-clause semantics)
 
@@ -97,8 +80,9 @@ substantive doc item.
 
 ### Verify (remaining)
 
-- [ ] `cargo clippy` on the DFSDM chip matrix (`cargo check` + `cargo fmt` are
-  already green).
+- [x] `cargo clippy` on the DFSDM chip matrix (`cargo check` + `cargo fmt` +
+  in-scope clippy all green via `./check.sh --clippy`; out-of-scope crate-wide
+  lints are ignored by design).
 - [ ] `stm32mp157` — no feature in this crate's Cargo.toml yet; revisit later.
 - [ ] FT5 gate: the matrix doubles as the gate for the optional TIM15/16/17
   break impl.
