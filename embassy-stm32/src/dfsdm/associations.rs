@@ -116,7 +116,6 @@ macro_rules! impl_dfsdm_instance {
         repr: $repr:ty,
         transceivers: $tcv:ty,
         filters: $flt:ty,
-        trigger_bits: $tbs:ty,
         $(delay: $delay:tt,)?
         $(hwid: $hwid:tt,)?
         $(adc_input: $adc:tt,)?
@@ -137,7 +136,6 @@ macro_rules! impl_dfsdm_instance {
             type Repr = $repr;
             type Transceivers = $tcv;
             type Filters = $flt;
-            type Bits = $tbs;
 
             fn instance_state() -> &'static InstanceState {
                 static INSTANCE_STATE: InstanceState = InstanceState::new();
@@ -194,7 +192,6 @@ macro_rules! mark_dfsdm_instances {
                 repr: $repr:ident,
                 transceivers: $transceivers:ident,
                 filters: $filters:ident,
-                trigger_bits: $tbs:ident,
                 delay: $delay:tt,
                 hwid: $hwid:tt,
                 adc_input: $adc:tt $(,)?
@@ -209,7 +206,6 @@ macro_rules! mark_dfsdm_instances {
                         repr: crate::pac::dfsdm::$repr,
                         transceivers: capability::$transceivers,
                         filters: capability::$filters,
-                        trigger_bits: capability::$tbs,
                         delay: $delay,
                         hwid: $hwid,
                         adc_input: $adc,
@@ -225,51 +221,19 @@ macro_rules! mark_dfsdm_instances {
 // Mark variants with attributes
 mark_dfsdm_instances! {
 
-    DFSDM_2CH_1FLT_DLY_TRG5_ADC => {
-        repr: Dfsdm2ch1fltDlyTrg5Adc,
-        transceivers: Tcv2,
-        filters: Flt1,
-        trigger_bits: TriggerBits5,
-        delay: true,
-        hwid: false,
-        adc_input: true,
-    },
-
-    DFSDM_2CH_1FLT_TRG3_ADC => {
-        repr: Dfsdm2ch1fltTrg3Adc,
-        transceivers: Tcv2,
-        filters: Flt1,
-        trigger_bits: TriggerBits3,
-        delay: false,
-        hwid: false,
-        adc_input: true,
-    },
-
     DFSDM_4CH_2FLT_TRG3 => {
         repr: Dfsdm4ch2fltTrg3,
         transceivers: Tcv4,
         filters: Flt2,
-        trigger_bits: TriggerBits3,
         delay: false,
         hwid: false,
         adc_input: false,
-    },
-
-    DFSDM_4CH_2FLT_TRG3_ADC => {
-        repr: Dfsdm4ch2fltTrg3Adc,
-        transceivers: Tcv4,
-        filters: Flt2,
-        trigger_bits: TriggerBits3,
-        delay: false,
-        hwid: false,
-        adc_input: true,
     },
 
     DFSDM_4CH_2FLT_DLY_TRG5_ADC => {
         repr: Dfsdm4ch2fltDlyTrg5Adc,
         transceivers: Tcv4,
         filters: Flt2,
-        trigger_bits: TriggerBits5,
         delay: true,
         hwid: false,
         adc_input: true,
@@ -279,7 +243,6 @@ mark_dfsdm_instances! {
         repr: Dfsdm4ch2fltDlyTrg5AdcHwid,
         transceivers: Tcv4,
         filters: Flt2,
-        trigger_bits: TriggerBits5,
         delay: true,
         hwid: true,
         adc_input: true,
@@ -289,27 +252,15 @@ mark_dfsdm_instances! {
         repr: Dfsdm4ch4fltDlyTrg5Adc,
         transceivers: Tcv4,
         filters: Flt4,
-        trigger_bits: TriggerBits5,
         delay: true,
         hwid: false,
         adc_input: true,
-    },
-
-    DFSDM_8CH_4FLT_TRG3 => {
-        repr: Dfsdm8ch4fltTrg3,
-        transceivers: Tcv8,
-        filters: Flt4,
-        trigger_bits: TriggerBits3,
-        delay: false,
-        hwid: false,
-        adc_input: false,
     },
 
     DFSDM_8CH_4FLT_TRG5 => {
         repr: Dfsdm8ch4fltTrg5,
         transceivers: Tcv8,
         filters: Flt4,
-        trigger_bits: TriggerBits5,
         delay: false,
         hwid: false,
         adc_input: false,
@@ -319,7 +270,6 @@ mark_dfsdm_instances! {
         repr: Dfsdm8ch4fltTrg3Adc,
         transceivers: Tcv8,
         filters: Flt4,
-        trigger_bits: TriggerBits3,
         delay: false,
         hwid: false,
         adc_input: true,
@@ -329,7 +279,6 @@ mark_dfsdm_instances! {
         repr: Dfsdm8ch4fltTrg5Adc,
         transceivers: Tcv8,
         filters: Flt4,
-        trigger_bits: TriggerBits5,
         delay: false,
         hwid: false,
         adc_input: true,
@@ -339,7 +288,6 @@ mark_dfsdm_instances! {
         repr: Dfsdm8ch4fltDlyTrg5Adc,
         transceivers: Tcv8,
         filters: Flt4,
-        trigger_bits: TriggerBits5,
         delay: true,
         hwid: false,
         adc_input: true,
@@ -349,7 +297,6 @@ mark_dfsdm_instances! {
         repr: Dfsdm8ch6fltDlyTrg5AdcHwid,
         transceivers: Tcv8,
         filters: Flt6,
-        trigger_bits: TriggerBits5,
         delay: true,
         hwid: true,
         adc_input: true,
@@ -359,9 +306,35 @@ mark_dfsdm_instances! {
         repr: Dfsdm8ch8fltDlyTrg5Adc,
         transceivers: Tcv8,
         filters: Flt8,
-        trigger_bits: TriggerBits5,
         delay: true,
         hwid: false,
         adc_input: true,
+    },
+
+    DFSDM_2CH_1FLT_TRG5 => {
+        repr: Dfsdm2ch1fltTrg5,
+        transceivers: Tcv2,
+        filters: Flt1,
+        delay: false,
+        hwid: false,
+        adc_input: false,
+    },
+
+    DFSDM_4CH_2FLT_DLY_TRG3 => {
+        repr: Dfsdm4ch2fltDlyTrg3,
+        transceivers: Tcv4,
+        filters: Flt2,
+        delay: true,
+        hwid: false,
+        adc_input: false,
+    },
+
+    DFSDM_8CH_4FLT_DLY_TRG3 => {
+        repr: Dfsdm8ch4fltDlyTrg3,
+        transceivers: Tcv8,
+        filters: Flt4,
+        delay: true,
+        hwid: false,
+        adc_input: false,
     },
 }

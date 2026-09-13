@@ -409,9 +409,9 @@ pub struct FilterConfig<T: Instance, M: FilterMarker> {
 
     /// Configures the trigger for injected conversions.
     ///
-    /// `Some` enables the trigger with the specified trigger source and edge.
-    /// `None` disables the trigger.
-    pub trigger: AnyTrigger<T, M>,
+    /// [`InjectedTrigger::Enabled`] enables the trigger with the specified trigger
+    /// source and edge; [`InjectedTrigger::Disabled`] disables it.
+    pub trigger: InjectedTrigger<T, M>,
 }
 
 impl<T: Instance, M: FilterMarker> Default for FilterConfig<T, M> {
@@ -423,7 +423,7 @@ impl<T: Instance, M: FilterMarker> Default for FilterConfig<T, M> {
             enable_injected_sync: false,
             enable_regular_sync: false,
             enable_injected_scanning: false,
-            trigger: AnyTrigger::None,
+            trigger: InjectedTrigger::Disabled,
         }
     }
 }
@@ -602,12 +602,12 @@ where
 
     /// Configures the trigger for injected conversions.
     ///
-    /// `Some` enables the trigger with the specified trigger source and edge.
-    /// `None` disables the trigger.
-    fn configure_injected_trigger(trigger: &AnyTrigger<T, M>) {
+    /// [`InjectedTrigger::Enabled`] enables the trigger with the specified trigger
+    /// source and edge; [`InjectedTrigger::Disabled`] disables it.
+    fn configure_injected_trigger(trigger: &InjectedTrigger<T, M>) {
         let (jextsel, jexten) = match trigger {
-            AnyTrigger::None => (0, 0), // disable
-            AnyTrigger::Injected { jextsel, edge, _m } => (*jextsel, *edge as u8),
+            InjectedTrigger::Disabled => (0, 0), // disable
+            InjectedTrigger::Enabled { jextsel, edge, _m } => (*jextsel, *edge as u8),
         };
 
         T::regs()

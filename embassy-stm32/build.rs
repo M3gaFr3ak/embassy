@@ -17,6 +17,9 @@ use stm32_metapac::metadata::{
 #[path = "./build_common.rs"]
 mod common;
 
+#[path = "src/dfsdm/trigger_map.rs"]
+mod dfsdm_trigger_map;
+
 /// Helper function to handle peripheral versions with underscores.
 /// For a version like "v1_foo_bar", this generates all prefix combinations:
 /// - "kind_v1"
@@ -2254,8 +2257,6 @@ fn main() {
         (("timer", "TIMX_TI2_IN"), quote!(crate::timer::TimerInputTrigger<Ch2>)),
         (("timer", "TIMX_TI3_IN"), quote!(crate::timer::TimerInputTrigger<Ch3>)),
         (("timer", "TIMX_TI4_IN"), quote!(crate::timer::TimerInputTrigger<Ch4>)),
-        (("dfsdm", "DFSDM1_JTRG"), quote!(crate::dfsdm::InjectedTrigger)),
-        (("dfsdm", "DFSDM2_JTRG"), quote!(crate::dfsdm::InjectedTrigger)),
     ]
     .into();
 
@@ -2293,13 +2294,43 @@ fn main() {
 
             trigger_list.insert(trigger.source);
 
+            let source = format_ident!("{}", trigger.source);
+            let idx_q = quote!(#idx);
+
+            if regs.kind == "dfsdm" {
+                let inst = format_ident!("{}", p.name);
+                if regs.block.contains("TRG5") {
+                    // 5-bit JEXTSEL: the signal number *is* the JEXTSEL value,
+                    // and every source can drive every filter.
+                    g.extend(quote! {
+                        impl<M: crate::dfsdm::FilterMarker> crate::dfsdm::TriggerSource<crate::peripherals::#inst, M>
+                            for crate::triggers::#source {
+                            fn jextsel(&self) -> u8 { #idx_q }
+                        }
+                    });
+                } else {
+                    // 3-bit JEXTSEL: remap the channel number per filter.
+                    for &(flt, _, jextsel) in dfsdm_trigger_map::DFSDM_TRG3_JEXTSEL
+                        .iter()
+                        .filter(|(_, n, _)| *n == idx)
+                    {
+                        let flt = format_ident!("Flt{}", flt);
+                        g.extend(quote! {
+                            impl crate::dfsdm::TriggerSource<crate::peripherals::#inst, crate::dfsdm::#flt>
+                                for crate::triggers::#source {
+                                fn jextsel(&self) -> u8 { #jextsel }
+                            }
+                        });
+                    }
+                }
+                continue;
+            }
+
             if let Some(tr) = triggers.get(&(regs.kind, signal)) {
                 let peri = format_ident!("{}", p.name);
-                let source = format_ident!("{}", trigger.source);
-                let idx = quote!(#idx);
 
                 g.extend(quote! {
-                    trigger_trait_impl!(#tr, #peri, #source, #idx);
+                    trigger_trait_impl!(#tr, #peri, #source, #idx_q);
                 });
             }
         }
