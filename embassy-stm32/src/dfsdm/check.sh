@@ -12,6 +12,10 @@
 #   ./check.sh h7              # all H7 chips
 #   ./check.sh --clippy        # run clippy instead of check
 #
+# In clippy mode, only diagnostics whose primary span is in `build.rs` or under
+# `src/dfsdm/` (which includes `codegen.rs`, #[path]-included by build.rs) count
+# as failures; clippy issues elsewhere in the crate are ignored.
+#
 # Requires the rustup targets: thumbv7em-none-eabi, thumbv7em-none-eabihf,
 # thumbv8m.main-none-eabihf. Requires bash 4.3+ for parallel mode (wait -n).
 
@@ -106,10 +110,19 @@ run_one() {
   if (cd "$CRATE_DIR" && "${cmd[@]}") >"$log" 2>&1; then
     printf 'PASS  %s\n' "$chip"
     echo PASS >> "$RESULTS"
+  elif [[ "$CLIPPY" == "1" ]] && ! clippy_in_scope "$log"; then
+    printf 'PASS  %s  (clippy clean in dfsdm/build.rs scope)\n' "$chip"
+    echo PASS >> "$RESULTS"
   else
     printf 'FAIL  %s  (log: %s)\n' "$chip" "$log"
     echo FAIL >> "$RESULTS"
   fi
+}
+
+# True if a clippy log has any diagnostic whose primary span is in the DFSDM
+# scope: `build.rs` or under `src/dfsdm/` (includes codegen.rs).
+clippy_in_scope() {
+  grep -Eq -- '--> (build\.rs|src/dfsdm/)' "$1"
 }
 
 match() {

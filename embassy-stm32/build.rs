@@ -2284,7 +2284,7 @@ fn main() {
         }
 
         if regs.kind == "dfsdm" {
-            g.extend(dfsdm_codegen::gen_instance(&p.name, regs.block));
+            g.extend(dfsdm_codegen::gen_instance(p.name, regs.block));
         }
 
         for trigger in p.triggers {
@@ -2302,7 +2302,7 @@ fn main() {
             let idx_q = quote!(#idx);
 
             if regs.kind == "dfsdm" {
-                g.extend(dfsdm_codegen::gen_trigger_source(&p.name, regs.block, &source, idx));
+                g.extend(dfsdm_codegen::gen_trigger_source(p.name, regs.block, &source, idx));
                 continue;
             }
 

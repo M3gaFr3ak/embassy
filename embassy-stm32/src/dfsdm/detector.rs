@@ -214,12 +214,12 @@ where
 
     /// Whether the low-threshold flag is set for `channel`.
     pub fn channel_flag_low(&self, channel: TransceiverChannel) -> bool {
-        self.flags_low().get_bit(channel.index() as usize)
+        self.flags_low().get_bit(channel.index())
     }
 
     /// Whether the high-threshold flag is set for `channel`.
     pub fn channel_flag_high(&self, channel: TransceiverChannel) -> bool {
-        self.flags_high().get_bit(channel.index() as usize)
+        self.flags_high().get_bit(channel.index())
     }
 
     /// Low-threshold flag bitmap.
@@ -486,7 +486,7 @@ where
 
     /// Whether the short-circuit flag is set for `channel`.
     pub fn channel_flag(&self, channel: TransceiverChannel) -> bool {
-        self.flags().get_bit(channel.index() as usize)
+        self.flags().get_bit(channel.index())
     }
 
     /// Clear the short-circuit flag for `channel`.
@@ -616,7 +616,7 @@ where
 
     /// Whether the clock-absence flag is set for `channel`.
     pub fn channel_flag(&self, channel: TransceiverChannel) -> bool {
-        self.flags().get_bit(channel.index() as usize)
+        self.flags().get_bit(channel.index())
     }
 
     /// Clear the clock-absence flag for `channel`.
@@ -704,6 +704,6 @@ pub(crate) fn filterword_of<T: Instance>(transceivers: &[&dyn TransceiverTrait<T
 
 /// Valid-bits mask for this shape; every mask user passes gets intersected with it.
 pub(crate) const fn channel_count_mask<T: Instance>() -> u8 {
-    let count = <T::Transceivers as capability::TransceiverCount>::COUNT as u8;
+    let count = <T::Transceivers as capability::TransceiverCount>::COUNT;
     ((1u16 << count) - 1) as u8
 }

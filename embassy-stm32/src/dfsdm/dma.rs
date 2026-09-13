@@ -30,7 +30,7 @@ where
 {
     /// Attach a DMA ring buffer to this filter's regular-conversion data register.
     pub fn ring_buffered<'e, D: Dma<T, M>>(
-        self: &'e mut Self,
+        &'e mut self,
         dma: Peri<'e, D>,
         irq: impl Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'e,
         dma_buf: &'e mut [u32],
@@ -48,7 +48,7 @@ where
 {
     /// Attach a DMA ring buffer to this filter's injected-conversion data register.
     pub fn ring_buffered<'e, D: Dma<T, M>>(
-        self: &'e mut Self,
+        &'e mut self,
         dma: Peri<'e, D>,
         irq: impl Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'e,
         dma_buf: &'e mut [u32],

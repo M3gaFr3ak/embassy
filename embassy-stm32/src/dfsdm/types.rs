@@ -179,7 +179,6 @@ impl_sealed_and! {
 /// Generalized pin traits
 ///
 ///
-
 macro_rules! define_dfsdm_pin_trait {
     ($trait:ident, $description:literal) => {
         #[doc = $description]

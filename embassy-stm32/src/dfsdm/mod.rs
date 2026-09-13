@@ -138,7 +138,7 @@ where
         Self {
             _instance_marker: PhantomData,
             _clock_mode: PhantomData,
-            ckout: ckout,
+            ckout,
             peri: Some(peri),
         }
     }

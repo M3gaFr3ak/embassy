@@ -537,7 +537,7 @@ impl FilterOrder {
     /// Tests whether the filter order + OSR combination is at least
     /// arithmetically representable (the gain calculation itself doesn't
     /// overflow `u128`). Does not check against any input-width gain ceiling
-    /// - a filter can be `valid()` and still be far too high-gain for a
+    /// A filter can be `valid()` and still be far too high-gain for a
     /// given accumulator/input-width combination; see
     /// [`FilterParameters::total_gain_checked`] for that check.
     fn valid(&self) -> bool {

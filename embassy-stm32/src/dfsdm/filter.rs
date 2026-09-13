@@ -307,7 +307,6 @@ where
     /// rather than mutating in place. This is pure borrow-checker bookkeeping,
     /// not a hardware requirement - see [`FilterRegular::assign_transceiver`]
     /// for the in-place alternative when the lifetime doesn't need to change.
-
     pub fn replace_regular_transceiver<'new_reg>(
         self,
         transceiver: &'new_reg dyn TransceiverTrait<T, Enabled>,
