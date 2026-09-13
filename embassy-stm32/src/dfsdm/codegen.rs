@@ -237,12 +237,14 @@ fn gen_split(ch: u8, flt_n: u8) -> TokenStream {
         let t = &tcv_idents[i];
         let own = &s[i];
         let neighbor = &s[(i + 1) % ch];
-        quote! { pub #c: crate::dfsdm::TransceiverBuilder<T, crate::dfsdm::#t, C, #own, #neighbor>, }
+        let doc = format!("Builder for [`crate::dfsdm::Transceiver`] {}.", i);
+        quote! { #[doc = #doc] pub #c: crate::dfsdm::TransceiverBuilder<T, crate::dfsdm::#t, C, #own, #neighbor>, }
     });
     let struct_filters = (0..flt_count).map(|i| {
         let f = &flt_idents[i];
         let m = &flt_markers[i];
-        quote! { pub #f: crate::dfsdm::FilterBuilder<T, crate::dfsdm::#m>, }
+        let doc = format!("Builder for [`crate::dfsdm::Filter`] {}.", i);
+        quote! { #[doc = #doc] pub #f: crate::dfsdm::FilterBuilder<T, crate::dfsdm::#m>, }
     });
 
     let build_args = (0..ch).map(|i| {
@@ -271,12 +273,17 @@ fn gen_split(ch: u8, flt_n: u8) -> TokenStream {
     });
 
     quote! {
+        /// One [`crate::dfsdm::TransceiverBuilder`] per transceiver, one
+        /// [`crate::dfsdm::FilterBuilder`] per filter, and the shared
+        /// [`crate::dfsdm::DetectorsBuilder`].
         pub struct #name<T, C, #(#s),*>
         where
             T: crate::dfsdm::Instance + crate::dfsdm::#ready,
             C: crate::dfsdm::ClockOutputMode,
             #(#s: crate::dfsdm::PinSet,)*
         {
+            /// Builds the instance-level [`crate::dfsdm::ShortCircuitDetector`] and
+            /// [`crate::dfsdm::ClockAbsenceDetector`].
             pub detectors: crate::dfsdm::DetectorsBuilder<T>,
             #(#struct_channels)*
             #(#struct_filters)*
@@ -320,7 +327,8 @@ fn gen_selector(ch: u8) -> TokenStream {
     let fields = (0..ch).map(|i| {
         let c = &ch_idents[i];
         let t = &tcv_idents[i];
-        quote! { pub #c: crate::dfsdm::Sel<T, crate::dfsdm::#t>, }
+        let doc = format!("Pin selector for transceiver {}.", i);
+        quote! { #[doc = #doc] pub #c: crate::dfsdm::Sel<T, crate::dfsdm::#t>, }
     });
     let constructs = (0..ch).map(|i| {
         let c = &ch_idents[i];
@@ -328,6 +336,9 @@ fn gen_selector(ch: u8) -> TokenStream {
     });
 
     quote! {
+        /// The pin selectors handed to the [`crate::dfsdm::Dfsdm::configure_pins`]
+        /// closure. Declare each transceiver's pins with [`crate::dfsdm::Sel::datin`],
+        /// [`crate::dfsdm::Sel::datin_ckin`] or [`crate::dfsdm::Sel::none`].
         pub struct #name<T: crate::dfsdm::Instance> {
             #(#fields)*
         }

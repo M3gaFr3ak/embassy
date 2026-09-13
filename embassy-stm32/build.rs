@@ -17,7 +17,7 @@ use stm32_metapac::metadata::{
 #[path = "./build_common.rs"]
 mod common;
 
-#[path = "src/dfsdm/codegen.rs"]
+#[path = "./src/dfsdm/codegen.rs"]
 mod dfsdm_codegen;
 
 /// Helper function to handle peripheral versions with underscores.
@@ -3202,6 +3202,7 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/dfsdm/codegen.rs");
 
     if cfg!(feature = "memory-x") {
         gen_memory_x(memory, out_dir);
