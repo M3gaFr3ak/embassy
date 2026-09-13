@@ -4,6 +4,10 @@ use crate::dma::{Channel, ReadableRingBuffer};
 use crate::interrupt::typelevel::Binding;
 use crate::rcc::WakeGuard;
 
+// =============================================================================
+// DMA ring buffer read path
+// =============================================================================
+
 /// A filter bound to a DMA ring buffer, for reading converted samples.
 pub struct RingBufferedFilter<'e, T, M, DM: DmaMode>
 where

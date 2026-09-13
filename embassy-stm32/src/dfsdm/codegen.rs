@@ -6,6 +6,10 @@
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 
+// =============================================================================
+// Shape data
+// =============================================================================
+
 /// A parsed DFSDM register-block shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Shape {
@@ -126,6 +130,10 @@ pub const DFSDM_TRG3_JEXTSEL: &[(u8, u8, u8)] = &[
     (3, 10, 7),
 ];
 
+// =============================================================================
+// Instance codegen
+// =============================================================================
+
 /// Emit `SealedInstance` + `Instance` + capability-flag impls for one DFSDM
 /// instance, derived entirely from its register-block name.
 pub fn gen_instance(inst: &str, block: &str) -> TokenStream {
@@ -165,6 +173,10 @@ pub fn gen_instance(inst: &str, block: &str) -> TokenStream {
     ts
 }
 
+// =============================================================================
+// Trigger codegen
+// =============================================================================
+
 /// Emit the `TriggerSource` impls for one injected-trigger source on one DFSDM
 /// instance. 5-bit parts get an identity blanket over all filters; 3-bit parts
 /// get the per-filter remap from [`DFSDM_TRG3_JEXTSEL`].
@@ -197,6 +209,10 @@ pub fn gen_trigger_source(inst: &str, block: &str, source: &Ident, idx: u8) -> T
         quote! { #(#impls)* }
     }
 }
+
+// =============================================================================
+// Shape codegen
+// =============================================================================
 
 /// Emit the whole shape-dependent surface: the six split structs, the three
 /// channel-selector structs and the three `ChannelCfgTuple` impls, all inside

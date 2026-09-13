@@ -205,9 +205,9 @@ define_dfsdm_pin_trait!(CkinPin, "Associates a DFSDM clock-input pin with a tran
 
 define_dfsdm_pin_trait!(DatinPin, "Associates a DFSDM data-input pin with a transceiver.");
 
-// ============================================================
+// =============================================================================
 // Pin presence markers (PinSet)
-// ============================================================
+// =============================================================================
 
 /// Type-level pin presence of one transceiver. Exactly three states exist;
 /// "clock without data" has no representative and is therefore inexpressible.
@@ -289,9 +289,9 @@ impl HasData for DataClk {}
 pub trait HasDataAndClk: PinSet {}
 impl HasDataAndClk for DataClk {}
 
-// ============================================================
+// =============================================================================
 // Channel config tokens
-// ============================================================
+// =============================================================================
 
 /// Pin token: the transceiver gets no pins. Valid in any slot.
 pub struct NoPinsCfg;
