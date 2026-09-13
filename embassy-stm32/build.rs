@@ -17,8 +17,8 @@ use stm32_metapac::metadata::{
 #[path = "./build_common.rs"]
 mod common;
 
-#[path = "src/dfsdm/trigger_map.rs"]
-mod dfsdm_trigger_map;
+#[path = "src/dfsdm/codegen.rs"]
+mod dfsdm_codegen;
 
 /// Helper function to handle peripheral versions with underscores.
 /// For a version like "v1_foo_bar", this generates all prefix combinations:
@@ -2283,6 +2283,10 @@ fn main() {
             continue;
         }
 
+        if regs.kind == "dfsdm" {
+            g.extend(dfsdm_codegen::gen_instance(&p.name, regs.block));
+        }
+
         for trigger in p.triggers {
             if trigger_expr.captures(trigger.signal).is_none() {
                 eprintln!("Expression: {:?}", trigger_expr);
@@ -2298,31 +2302,7 @@ fn main() {
             let idx_q = quote!(#idx);
 
             if regs.kind == "dfsdm" {
-                let inst = format_ident!("{}", p.name);
-                if regs.block.contains("TRG5") {
-                    // 5-bit JEXTSEL: the signal number *is* the JEXTSEL value,
-                    // and every source can drive every filter.
-                    g.extend(quote! {
-                        impl<M: crate::dfsdm::FilterMarker> crate::dfsdm::TriggerSource<crate::peripherals::#inst, M>
-                            for crate::triggers::#source {
-                            fn jextsel(&self) -> u8 { #idx_q }
-                        }
-                    });
-                } else {
-                    // 3-bit JEXTSEL: remap the channel number per filter.
-                    for &(flt, _, jextsel) in dfsdm_trigger_map::DFSDM_TRG3_JEXTSEL
-                        .iter()
-                        .filter(|(_, n, _)| *n == idx)
-                    {
-                        let flt = format_ident!("Flt{}", flt);
-                        g.extend(quote! {
-                            impl crate::dfsdm::TriggerSource<crate::peripherals::#inst, crate::dfsdm::#flt>
-                                for crate::triggers::#source {
-                                fn jextsel(&self) -> u8 { #jextsel }
-                            }
-                        });
-                    }
-                }
+                g.extend(dfsdm_codegen::gen_trigger_source(&p.name, regs.block, &source, idx));
                 continue;
             }
 
@@ -2762,6 +2742,8 @@ fn main() {
         let row = vec![regs.kind.to_string(), p.name.to_string()];
         peripherals_table.push(row);
     }
+
+    g.extend(dfsdm_codegen::gen_shapes());
 
     let mut dmas = TokenStream::new();
     let has_dmamux = METADATA

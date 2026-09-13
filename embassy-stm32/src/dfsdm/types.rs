@@ -70,8 +70,6 @@ pub(crate) trait SealedInstance: crate::rcc::RccPeripheral {
 /// DFSDM instance.
 #[allow(private_bounds)]
 pub trait Instance: SealedInstance + PeripheralType + 'static {
-    /// PAC representation
-    type Repr;
     /// Amount of transceivers in this instance
     type Transceivers: capability::TransceiverCount;
     /// Amount of filters in this instance
@@ -394,7 +392,7 @@ impl_noop_instance_events!(Flt1, Flt2, Flt3, Flt4, Flt5, Flt6, Flt7);
 
 // Ready bundles: one per filter-count capability, bundling the
 // `FilterInterrupt<FltN>` chain for all filters the shape has. The chain
-// matches the IRQ template (`dfsdm_flt_irqs!`) in associations.rs.
+// matches the unconditional `foreach_interrupt!` binding in associations.rs.
 macro_rules! define_dfsdm_ready {
     ($name:ident, [$($flt:ident),+ $(,)?]) => {
         /// IRQ readiness bundle: all the `FilterInterrupt`s a filter-count

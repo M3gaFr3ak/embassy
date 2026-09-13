@@ -27,6 +27,8 @@ use interrupt::typelevel::Interrupt;
 pub use splits::*;
 pub use types::*;
 
+pub use crate::_generated::dfsdm::*;
+
 use crate::dfsdm::capability::HasDelay;
 use crate::dfsdm::config_types::{BreakSignals, FilterParameters};
 use crate::gpio::{AfType, Flex, OutputType, Pull, Speed};
@@ -224,7 +226,7 @@ pub struct DfsdmCommon<'d, T: Instance, P: PowerState> {
     ckin_slots: [PinSlot<'d>; 8],
 }
 impl<'d, T: Instance, P: PowerState> DfsdmCommon<'d, T, P> {
-    fn insert_pin(&mut self, ch: usize, kind: PinKind, flex: Option<Flex<'d>>) {
+    pub(crate) fn insert_pin(&mut self, ch: usize, kind: PinKind, flex: Option<Flex<'d>>) {
         if let Some(p) = flex {
             let slot = match kind {
                 PinKind::Datin => &mut self.datin_slots[ch],
@@ -2563,6 +2565,16 @@ pub(crate) const fn channel_count_mask<T: Instance>() -> u8 {
 /// channel's pins can be declared exactly once (E0382 otherwise).
 pub struct Sel<T: Instance, M: TransceiverMarker> {
     _m: PhantomData<(T, M)>,
+}
+
+impl<T, M> Sel<T, M>
+where
+    T: Instance,
+    M: TransceiverMarker,
+{
+    pub(crate) fn new() -> Self {
+        Self { _m: PhantomData }
+    }
 }
 
 impl<'d, T, M> Sel<T, M>

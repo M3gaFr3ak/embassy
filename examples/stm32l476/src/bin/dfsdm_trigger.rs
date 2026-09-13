@@ -17,7 +17,7 @@ use defmt::info;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_stm32::dfsdm::config_types::{FilterOrder, FilterParameters, TriggerEdge};
-use embassy_stm32::dfsdm::{Flt0, Flt1, Flt2, Flt3, FilterConfig, InjectedTrigger, TriggerSource};
+use embassy_stm32::dfsdm::{FilterConfig, Flt0, Flt1, Flt2, Flt3, InjectedTrigger, TriggerSource};
 use embassy_stm32::peripherals::DFSDM1;
 use embassy_stm32::triggers::{TIM1_TRGO, TIM3_TRGO, TIM6_TRGO, TIM7_TRGO};
 use embassy_stm32::{bind_interrupts, dfsdm};
@@ -83,10 +83,22 @@ async fn main(_spawner: Spawner) {
         ..Default::default()
     };
 
-    let _flt0 = split.flt0.build(&common, Irqs).enable_no_dma(&channel, [&channel], &flt0_cfg);
-    let _flt1 = split.flt1.build(&common, Irqs).enable_no_dma(&channel, [&channel], &flt1_cfg);
-    let _flt2 = split.flt2.build(&common, Irqs).enable_no_dma(&channel, [&channel], &flt2_cfg);
-    let _flt3 = split.flt3.build(&common, Irqs).enable_no_dma(&channel, [&channel], &flt3_cfg);
+    let _flt0 = split
+        .flt0
+        .build(&common, Irqs)
+        .enable_no_dma(&channel, [&channel], &flt0_cfg);
+    let _flt1 = split
+        .flt1
+        .build(&common, Irqs)
+        .enable_no_dma(&channel, [&channel], &flt1_cfg);
+    let _flt2 = split
+        .flt2
+        .build(&common, Irqs)
+        .enable_no_dma(&channel, [&channel], &flt2_cfg);
+    let _flt3 = split
+        .flt3
+        .build(&common, Irqs)
+        .enable_no_dma(&channel, [&channel], &flt3_cfg);
 
     log_trigger::<DFSDM1, Flt0, _>("flt0", &TIM6_TRGO);
     log_trigger::<DFSDM1, Flt1, _>("flt1", &TIM1_TRGO);
