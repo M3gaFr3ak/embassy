@@ -656,7 +656,7 @@ impl_next_channel!(capability::Tcv8,
 // DMA Stuff
 // =============================================================================
 
-dma_trait!(Dma, Instance, FilterMarker); //TODO
+dma_trait!(Dma, Instance, FilterMarker);
 
 /// No DMA.
 pub struct NoDma;
