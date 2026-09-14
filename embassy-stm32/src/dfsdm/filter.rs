@@ -201,7 +201,7 @@ where
         Self::configure_injected_trigger(&config.trigger);
     }
 
-    /// Writes the filterparameters
+    /// Writes the filter order, FOSR and IOSR into the filter registers.
     fn set_filter_parameters(params: config::FilterParameters) {
         let (order, fosr, iosr) = params.register_values();
         T::regs().flt(M::CHANNEL.index()).fcr().modify(|w| {
@@ -814,7 +814,7 @@ where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
-    /// Enable or disable the filter
+    /// Enables or disables the filter (DFEN).
     pub(crate) fn set_enabled(enabled: bool) {
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_dfen(enabled));
     }
@@ -949,7 +949,7 @@ where
     }
 }
 
-/// Used to build a [`Filter`].
+/// Builder for a [`Filter`]; binds it to `DfsdmCommon` on `build`.
 pub struct FilterBuilder<T, M>
 where
     T: Instance,

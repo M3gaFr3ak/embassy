@@ -8,7 +8,7 @@ use crate::time::Hertz;
 // Config types
 // =============================================================================
 
-/// Output serial clock source.
+/// Source clock for the CKOUT output.
 #[derive(Copy, Clone)]
 pub enum CkoutSource {
     /// Source for output clock is from system clock
@@ -47,10 +47,9 @@ impl CkoutDivider {
     /// Compute the divider to get a wanted CKOUT output frequency from the
     /// CKOUT source clock.
     ///
-    /// `source` is the CKOUT input clock (system or audio, selected by
-    /// [`CkoutSource`]); `ckout_rate` is the wanted CKOUT frequency. The
-    /// divider is rounded up so the actual CKOUT frequency never exceeds
-    /// `ckout_rate`.
+    /// `source` is the CKOUT input clock (selected by [`CkoutSource`]);
+    /// `ckout_rate` is the wanted CKOUT frequency. The divider is rounded
+    /// up so the actual CKOUT frequency never exceeds `ckout_rate`.
     ///
     /// The DFSDM kernel clock (`crate::rcc::frequency::<T>()`) must be at
     /// least 4x `ckout_rate` (SPI coding, RM0455); this is enforced here.
@@ -230,7 +229,7 @@ impl From<ChannelInput> for bool {
     }
 }
 
-/// Input data multiplexer
+/// Selects where a transceiver's parallel input data comes from.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum InputDataMux {
@@ -243,7 +242,7 @@ pub enum InputDataMux {
     // 3 = Reserved
 }
 
-/// SPI clock select for a transceiver.
+/// Serial-interface clock source.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum SpiClockSelect {
@@ -261,7 +260,7 @@ pub enum SpiClockSelect {
     InternalCkoutRisingHalved = 3,
 }
 
-/// Serial interface type.
+/// Serial interface type and sampling edge.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum SerialInterfaceType {
@@ -430,7 +429,7 @@ impl From<ManchesterMode> for SerialInterfaceType {
     }
 }
 
-/// SPI Edge mode for internal clock use
+/// Sampling edge for the internally-generated serial clock (SPICKSEL = 1).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum InternalSpiMode {
     /// Sampling on the rising edge of the clock
@@ -640,7 +639,7 @@ impl FilterParameters {
     }
 
     /// Try to create from the actual OSR value, assuming a 1-bit serial input.
-    /// See TRM or [`FilterOrder::max_osr`] for valid OSR and IOSR.
+    /// See the TRM for valid OSR and IOSR.
     /// Filter gain and total gain must each <= 2^31.
     ///
     /// Returns [`Error::InvalidFilterParameters`] if `iosr` is outside
@@ -659,8 +658,8 @@ impl FilterParameters {
     }
 
     /// Try to create from the actual OSR value and the effective input
-    /// bit-width. Filter gain and total gain must each fit under
-    /// [`max_gain`] for the given `width`.
+    /// bit-width. Filter gain and total gain must each fit under `max_gain` for
+    /// the given `width`.
     ///
     /// Returns [`Error::InvalidFilterParameters`] if `iosr` is outside
     /// `1..=256`, the filter order's FOSR is invalid, or the resulting gain

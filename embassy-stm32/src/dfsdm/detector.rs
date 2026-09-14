@@ -16,7 +16,7 @@ impl<T> DetectorsBuilder<T>
 where
     T: Instance + FilterInterrupt<Flt0>,
 {
-    /// Creates a new builder for a filter.
+    /// Creates a new detectors builder.
     pub(crate) fn new() -> Self {
         Self { _marker: PhantomData }
     }

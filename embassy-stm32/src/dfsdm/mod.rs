@@ -154,7 +154,7 @@ where
     T: Instance + capability::HasHwid,
     C: ClockOutputMode,
 {
-    /// Reads the version/ID register cluster.
+    /// Reads the DFSDM version/ID register cluster (HWCFGR, VERR, IPIDR, SIDR).
     ///
     /// `filter_count`/`transceiver_count` self-describe the silicon; embassy's
     /// compile-time capability tags remain the primary shape mechanism.

@@ -216,16 +216,27 @@ where
     /// Samples can be fed either by CPU writes ([`Self::write_sample_standard`] /
     /// [`Self::write_indat1`]) or by DMA: use this pointer as the destination of
     /// a memory-to-peripheral transfer (e.g. [`crate::dma::WritableRingBuffer`]).
+    /// The word layout follows the configured packing mode: one 16-bit sample
+    /// per word in Standard, two in Interleaved/Dual.
     pub fn get_datinr_as_ptr(&self) -> *mut u32 {
         T::regs().ch(M::CHANNEL.index()).datinr().as_ptr() as *mut u32
     }
 
-    /// Manually write one sample into the DATINR register, used for standard mode
+    /// Write one sample into the DATINR register (Standard packing, DATPACK = 0).
+    ///
+    /// Loads `data` into `INDAT0[15:0]`; the upper `INDAT1[15:0]` field is ignored
+    /// and write-protected in this mode. One 16-bit sample per write.
     pub fn write_sample_standard(&self, data: u16) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| w.set_indat0(data));
     }
 
-    /// Manually write two subsequent samples into the DATINR register, used for interleaved mode
+    /// Write two samples into the DATINR register (Interleaved or Dual packing).
+    ///
+    /// Loads `data[0]` into `INDAT0[15:0]` and `data[1]` into `INDAT1[15:0]`. In
+    /// Interleaved packing (DATPACK = 1) both samples go to channel `y`; in Dual
+    /// packing (DATPACK = 2, even channels only) INDAT0 goes to channel `y` and
+    /// INDAT1 is copied by the hardware into channel `y + 1`. Two 16-bit samples
+    /// per 32-bit write.
     pub fn write_indat1(&self, data: [u16; 2]) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| {
             w.set_indat0(data[0]);
@@ -243,7 +254,7 @@ where
     P: PowerState,
     PS: PinSource,
 {
-    /// Enable/Disable the transceiver
+    /// Enables or disables the transceiver (CHEN).
     pub(crate) fn set_enabled(enabled: bool) {
         T::regs().ch(M::CHANNEL.index()).cfgr1().modify(|w| w.set_chen(enabled));
     }
@@ -286,7 +297,7 @@ where
         self.set_pulseskips(skips);
     }
 
-    /// Set pulse `skips`
+    /// Sets the number of serial-clock pulses to skip (PLSSKP).
     fn set_pulseskips(&mut self, skips: config::PulsesToSkip) {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -303,7 +314,7 @@ pub type ParallelDmaPair<'a, 'd, T, M, S, MN, SN> = (
     Transceiver<'a, 'd, T, MN, SN, ParallelDmaMode, OwnPins, Disabled>,
 );
 
-/// Used to build a [`Transceiver`].
+/// Builder for a [`Transceiver`]; declare pins, then call a `build_*` to finish.
 pub struct TransceiverBuilder<T, M, C, S, SN>
 where
     T: Instance,
@@ -361,11 +372,16 @@ where
 
     /// Create a dual-mode DMA pair.
     ///
-    /// Returns transceivers for transceiver `M` (even, owns DATINR) and `MN`
-    /// (odd, reads INDAT1 from M's DATINR). Two filters must be configured -
-    /// one assigned to `M` (reads INDAT0, the lower word) and one to `MN`
-    /// (reads INDAT1, the upper word) - or the register won't drain and
-    /// you'll get overrun errors.
+    /// Returns the even transceiver `M` (Dual packing, owns the DATINR register)
+    /// and the odd neighbor `MN` (Standard packing). Feed both samples by
+    /// writing the *even* transceiver with [`Transceiver::write_indat1`]: INDAT0
+    /// goes to channel `y` and INDAT1 is copied by the hardware into channel
+    /// `y + 1` (the odd transceiver's INDAT0). The odd transceiver is fed by
+    /// that copy, so do not write it directly.
+    ///
+    /// Two filters must be configured - one on `M` (reads INDAT0) and one on
+    /// `MN` (reads the copied INDAT0) - or the register won't drain and you'll
+    /// get overrun errors.
     pub fn build_parallel_dma_dual<'a, 'd, MN, SNN>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,

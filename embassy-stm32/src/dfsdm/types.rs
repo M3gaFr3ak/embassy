@@ -601,7 +601,8 @@ pub trait NextChannel<C: capability::TransceiverCount>: TransceiverMarker {
     type Next: TransceiverMarker;
 }
 
-/// Convenience trait to get the next transceiver directly from an instance.
+/// Links a transceiver marker to the next channel's marker (modulo the
+/// instance channel count).
 pub trait NextChannelForInstance<T: Instance>: TransceiverMarker {
     /// Type representing the next TransceiverMarker in the sequence
     type Next: TransceiverMarker;
@@ -693,10 +694,11 @@ where
     T: Instance + FilterInterrupt<M>,
     M: FilterMarker + InstanceEvents<T>,
 {
-    /// Pointer to the filter's data register.
+    /// Pointer to the filter's data register (RDATAR for the regular half,
+    /// JDATAR for injected), for custom DMA.
     fn data_register(&mut self) -> *mut u32;
 
-    /// Starts the conversion.
+    /// Starts a conversion (regular or injected, depending on the half).
     fn start_conversion(&mut self);
 
     /// Checks and clears the overrun flag; returns whether it was set.
@@ -714,7 +716,7 @@ where
     T: Instance,
     P: PowerState,
 {
-    /// Get transceiver index
+    /// Returns this transceiver's channel index.
     fn index(&self) -> usize;
 }
 
