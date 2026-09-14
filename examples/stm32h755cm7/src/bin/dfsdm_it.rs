@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//! PDM mic -> DFSDM -> print each conversion result (interrupt-driven).
+
 use core::mem::MaybeUninit;
 
 use defmt::*;
@@ -48,9 +50,7 @@ async fn main(_spawner: Spawner) {
         config.rcc.supply_config = SupplyConfig::DirectSMPS;
     }
 
-    //==================================================
-    // Demonstrate interrupts
-    //==================================================
+    // PDM mic -> DFSDM -> print each result.
 
     // A0   PA3     MIC_SEL
     // A2   PC3_C   MIT_DAT

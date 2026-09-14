@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//! DFSDM short-circuit detector demo.
+
 use core::mem::MaybeUninit;
 
 use defmt::*;
@@ -47,9 +49,7 @@ async fn main(_spawner: Spawner) {
         config.rcc.supply_config = SupplyConfig::DirectSMPS;
     }
 
-    //==================================================
-    // Demonstrate interrupts
-    //==================================================
+    // Report short-circuit events on the mic channel.
 
     // A0   PA3     MIC_SEL
     // A2   PC3_C   MIT_DAT

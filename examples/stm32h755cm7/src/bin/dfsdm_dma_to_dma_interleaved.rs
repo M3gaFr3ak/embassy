@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//! Interleaved parallel input -> DFSDM -> DMA ring buffer, compared against a software sum.
+
 use core::mem::MaybeUninit;
 
 use defmt::*;
@@ -75,18 +77,14 @@ async fn main(_spawner: Spawner) {
         )
     });
 
-    // ==================================================
-    // Pseudorandom data
-    // ==================================================
+    // Pseudorandom data.
     // Interleaved packing: two 16-bit samples per u32 word, both to channel 0.
     const TOTAL: usize = IOSR as usize * N_OUT;
     let samples: [u16; TOTAL] = core::array::from_fn(|i| lcg(i as u32));
     let source: [u32; TOTAL / 2] =
         core::array::from_fn(|i| (samples[2 * i] as u32) | ((samples[2 * i + 1] as u32) << 16));
 
-    // ==================================================
-    // Setup
-    // ==================================================
+    // Setup.
     let ch = split
         .ch0
         .build_parallel_interleaved(&common)
@@ -113,9 +111,7 @@ async fn main(_spawner: Spawner) {
         unsafe { dma_ch.write_mem2mem::<u32, u32>(0, &source, ch.get_datinr_as_ptr(), TransferOptions::default()) };
     tfer.await;
 
-    // ==================================================
-    // Manual integration
-    // ==================================================
+    // Manual integration.
     let manual: [i32; N_OUT] = core::array::from_fn(|k| {
         samples[k * IOSR as usize..(k + 1) * IOSR as usize]
             .iter()
@@ -123,9 +119,7 @@ async fn main(_spawner: Spawner) {
             .sum()
     });
 
-    // ==================================================
-    // Comparison
-    // ==================================================
+    // Comparison.
     let mut result = [0u32; N_OUT];
     ring.read(&mut result).await.unwrap();
 

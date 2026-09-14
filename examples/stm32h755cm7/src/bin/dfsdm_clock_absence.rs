@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//! DFSDM clock-absence detector demo.
+
 use core::mem::MaybeUninit;
 
 use defmt::*;
@@ -47,9 +49,7 @@ async fn main(_spawner: Spawner) {
         config.rcc.supply_config = SupplyConfig::DirectSMPS;
     }
 
-    //==================================================
-    // Demonstrate interrupts
-    //==================================================
+    // Report clock-absence events on the mic channel.
 
     // A0   PA3     MIC_SEL
     // A2   PC3_C   MIT_DAT

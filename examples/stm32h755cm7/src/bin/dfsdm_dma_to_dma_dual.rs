@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//! Dual (paired) parallel input -> DFSDM -> two DMA ring buffers, compared against software sums.
+
 use core::mem::MaybeUninit;
 
 use defmt::*;
@@ -77,9 +79,7 @@ async fn main(_spawner: Spawner) {
         )
     });
 
-    // ==================================================
-    // Pseudorandom data
-    // ==================================================
+    // Pseudorandom data.
     // Dual packing: one 16-bit sample for the even channel (INDAT0) and one for
     // the odd channel (INDAT1) per u32 word.
     const TOTAL: usize = IOSR as usize * N_OUT;
@@ -87,9 +87,7 @@ async fn main(_spawner: Spawner) {
     let odd: [u16; TOTAL] = core::array::from_fn(|i| lcg(2 * i as u32 + 1));
     let source: [u32; TOTAL] = core::array::from_fn(|i| (even[i] as u32) | ((odd[i] as u32) << 16));
 
-    // ==================================================
-    // Setup
-    // ==================================================
+    // Setup.
     let pair = split
         .ch0
         .build_parallel_dual(&common, split.ch1)
@@ -134,9 +132,7 @@ async fn main(_spawner: Spawner) {
         unsafe { dma_ch.write_mem2mem::<u32, u32>(0, &source, pair.get_datinr_as_ptr(), TransferOptions::default()) };
     tfer.await;
 
-    // ==================================================
-    // Manual integration
-    // ==================================================
+    // Manual integration.
     let manual_even: [i32; N_OUT] = core::array::from_fn(|k| {
         even[k * IOSR as usize..(k + 1) * IOSR as usize]
             .iter()
@@ -150,9 +146,7 @@ async fn main(_spawner: Spawner) {
             .sum()
     });
 
-    // ==================================================
-    // Comparison
-    // ==================================================
+    // Comparison.
     let mut result_even = [0u32; N_OUT];
     let mut result_odd = [0u32; N_OUT];
     ring_even.read(&mut result_even).await.unwrap();

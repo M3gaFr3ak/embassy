@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//! Parallel input via CPU writes -> DFSDM results, compared against a software sum.
+
 use core::mem::MaybeUninit;
 
 use defmt::*;
@@ -72,16 +74,12 @@ async fn main(_spawner: Spawner) {
         )
     });
 
-    // ==================================================
-    // Pseudorandom data
-    // ==================================================
+    // Pseudorandom data.
     // Standard packing: one 16-bit sample per CPU write.
     const TOTAL: usize = IOSR as usize * N_OUT;
     let samples: [u16; TOTAL] = core::array::from_fn(|i| lcg(i as u32));
 
-    // ==================================================
-    // Setup
-    // ==================================================
+    // Setup.
     let ch = split
         .ch0
         .build_parallel_standard(&common)
@@ -98,9 +96,7 @@ async fn main(_spawner: Spawner) {
     let mut flt0 = split.flt0.build(&common, Irqs).enable_no_dma(&ch, [&ch], &flt_cfg);
     flt0.regular.start_conversion();
 
-    // ==================================================
-    // Manual integration
-    // ==================================================
+    // Manual integration.
     let manual: [i32; N_OUT] = core::array::from_fn(|k| {
         samples[k * IOSR as usize..(k + 1) * IOSR as usize]
             .iter()
@@ -108,9 +104,7 @@ async fn main(_spawner: Spawner) {
             .sum()
     });
 
-    // ==================================================
-    // Feed + comparison
-    // ==================================================
+    // Feed + comparison.
     // Write one integrated group, read its result, so the filter never overruns.
     let mut all_ok = true;
     for k in 0..N_OUT {
