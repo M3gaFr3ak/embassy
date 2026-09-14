@@ -5,8 +5,8 @@ Closed work lives in `done.md`.
 
 ## Triage
 
-1. **P1 — substantive.** T-doc deep D-clauses: liveness (D1), ring layout (D8),
-   starvation recipe (FT8).
+1. **P1 — T-doc polish.** Remaining doc clauses (D2-D7, D9-D14), mostly one-line
+   `# Note`s; D1 (liveness), D8 (ring layout) and FT8 (conversion time) are done.
 2. **P2 — verify & examples.** `stm32mp157`, the FT5 break-caveat doc, five
    example gaps.
 3. **P3 — reflect / optional.** NITS notes, FT19, housekeeping.
@@ -14,26 +14,14 @@ Closed work lives in `done.md`.
 
 ---
 
-## P1 — T-doc (deep docstring semantics)
+## P1 — T-doc polish (remaining doc clauses)
 
-The module-restructure doc pass landed (every public item carries a docstring;
-`missing_docs` gate = 0 warnings). What remains is the deep hardware-semantics
-clauses below, written into the relevant docstrings (rustdoc [`Type`] links,
-§-refs where the TRM is load-bearing, `# Note`/`# Safety` rubrics; no em dashes;
-TRM content restated, not copied verbatim, ASCII punctuation only).
-
-**Must-do (silent hangs / data corruption):**
-
-- D1 — liveness contract on the read paths: `read()` hangs silently iff the
-  source is starved; document the layered detection (borrow-connected
-  transceivers, CKAB, CNVTIMR+timeout, overrun).
-- D8 — ring word layout: one u32 = `RDATA[23:8] | RPEND | RDATACH` (JDATA
-  analog); channel byte is load-bearing for scan demux; 32-bit only.
-- FT8 — `conversion_time()` starvation recipe: CNVTIMR measures filter activity,
-  not consumer progress; two Δt reads (frozen = starved, advancing =
-  alive-but-slow).
-
-**Nice-to-have:**
+The deep docstring clauses are done: D1 (liveness contract), D8 (ring word
+layout) and FT8 (conversion time), plus the `ResultRegular`/`ResultInjected`
+`from_word` decoders. What remains is the lighter one-line clauses, written into
+the relevant docstrings (rustdoc [`Type`] links, §-refs where the TRM is
+load-bearing, `# Note`/`# Safety` rubrics; no em dashes; TRM content restated,
+ASCII punctuation only):
 
 - D2 — assign asymmetry: JCHGR instant + scan reset; RCH shadowed until next RSWSTART.
 - D3 — `start_*`: requests ignored while RCIP/JCIP; injected preempts regular (restarts, flagged RPEND).

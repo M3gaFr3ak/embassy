@@ -12,6 +12,16 @@ use crate::rcc::WakeGuard;
 // =============================================================================
 
 /// A filter bound to a DMA ring buffer, for reading converted samples.
+///
+/// The buffer holds raw `u32` data-register words, not decoded samples: data in
+/// bits `[23:8]` (24-bit), channel in bits `[2:0]`, and, for regular
+/// conversions, the pending flag in bit `[4]`. The channel byte is load-bearing
+/// in scan mode: it identifies which transceiver produced each word. The buffer
+/// is 32-bit words only.
+///
+/// Decode each word with [`ResultRegular::from_word`] or
+/// [`ResultInjected::from_word`]; use [`FilterRegular::read`] for
+/// already-decoded, sign-extended results.
 pub struct RingBufferedFilter<'e, T, M, DM: DmaMode>
 where
     T: Instance + FilterInterrupt<M>,
@@ -135,6 +145,9 @@ where
 
     /// Read the most recent samples, discarding older data. Never blocks;
     /// returns the number of samples written into `buf`.
+    ///
+    /// `buf` receives raw `u32` data-register words; decode each with
+    /// [`ResultRegular::from_word`] or [`ResultInjected::from_word`].
     pub fn read_latest(&mut self, buf: &mut [u32]) -> Result<usize, Error> {
         self.autostart()?;
 
@@ -144,6 +157,13 @@ where
     /// Asynchronously read `buf.len()` samples. `buf.len()` must equal half of
     /// [`capacity`](Self::capacity), or this panics. Starts the DMA if needed;
     /// returns [`Error::Overrun`] if the buffer overran.
+    ///
+    /// `buf` receives raw `u32` data-register words; decode each with
+    /// [`ResultRegular::from_word`] or [`ResultInjected::from_word`].
+    ///
+    /// # Note
+    /// Like [`FilterRegular::read`], this hangs forever if the filter is
+    /// starved; see that method for the layered starvation detection.
     pub async fn read(&mut self, buf: &mut [u32]) -> Result<usize, Error> {
         assert_eq!(
             self.ring_buf.capacity() / 2,
@@ -158,6 +178,8 @@ where
 
     /// Blocking counterpart of [`read`](Self::read): spins until `buf.len()`
     /// samples are available, with the same half-capacity requirement.
+    ///
+    /// Like [`read`](Self::read), this never returns if the filter is starved.
     pub fn blocking_read(&mut self, buf: &mut [u32]) -> Result<usize, Error> {
         assert_eq!(
             self.ring_buf.capacity() / 2,

@@ -300,7 +300,20 @@ where
     }
     // Normal stuff,
 
-    /// 28-bit timer counting conversion time t = CNVCNT[27:0] / fDFSDMCLK
+    /// 28-bit conversion-time counter: `CNVCNT[27:0] / fDFSDMCLK` is the time
+    /// of the current (or most recent) conversion.
+    ///
+    /// The timer runs on the DFSDM kernel clock (fDFSDMCLK), starts when a
+    /// conversion starts and stops when it finishes, so it measures the interval
+    /// between the first and last serial sample of one conversion. The value is
+    /// proportional to `FOSR * IOSR / fCKIN`, where `fCKIN` is the channel input
+    /// clock (or the parallel input data rate), and it changes with each
+    /// completed conversion. A bypassed filter (FOSR = 1) yields 0.
+    ///
+    /// Not a reliable liveness signal: it only updates when a conversion
+    /// completes, so sampling it slower than the conversion rate aliases and
+    /// looks stuck even while the filter is healthy. Use [`ClockAbsenceDetector`]
+    /// or an overrun/timeout on your reads to detect starvation instead.
     pub fn conversion_timer(&self) -> u32 {
         T::regs().flt(M::CHANNEL.index()).cnvtimr().read().cnvcnt()
     }
@@ -392,12 +405,41 @@ pub struct ResultRegular {
     pub pending: bool,
 }
 
+impl ResultRegular {
+    /// Decode a raw `u32` RDATAR word, e.g. read from a DMA ring buffer.
+    ///
+    /// The word layout is `RDATA[23:8]` (24-bit data), `RPEND` (bit 4) and
+    /// `RDATACH[2:0]` (channel).
+    pub fn from_word(word: u32) -> Self {
+        let reg = crate::pac::dfsdm::regs::Rdatar(word);
+        ResultRegular {
+            data: sign_extend_24(reg.rdata()),
+            channel: reg.rdatach(),
+            pending: reg.rpend(),
+        }
+    }
+}
+
 /// Injected conversion result.
 pub struct ResultInjected {
     /// Sign-extended 24-bit sample.
     pub data: i32,
     /// Transceiver the sample came from.
     pub channel: u8,
+}
+
+impl ResultInjected {
+    /// Decode a raw `u32` JDATAR word, e.g. read from a DMA ring buffer.
+    ///
+    /// The word layout is `JDATA[23:8]` (24-bit data) and `JDATACH[2:0]`
+    /// (channel).
+    pub fn from_word(word: u32) -> Self {
+        let reg = crate::pac::dfsdm::regs::Jdatar(word);
+        ResultInjected {
+            data: sign_extend_24(reg.jdata()),
+            channel: reg.jdatach(),
+        }
+    }
 }
 
 impl<'a, 'd, 't, T, M, D> FilterRegular<'a, 'd, 't, T, M, D>
@@ -438,7 +480,20 @@ where
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_rswstart(true));
     }
 
-    /// Start a regular conversion and read its result asynchronously.
+    /// Start a regular conversion and await its result.
+    ///
+    /// Resolves with the next [`ResultRegular`] once a conversion completes.
+    ///
+    /// # Note
+    /// A starved filter hangs forever: if the assigned transceiver produces no
+    /// data (no modulator, dead clock, stalled source), no conversion completes
+    /// and this future stays pending indefinitely. Detect starvation in layers:
+    ///
+    /// - the transceiver is borrowed for the filter's lifetime, so the source
+    ///   cannot be dropped from under you (type system);
+    /// - [`ClockAbsenceDetector`] flags a missing or failed source clock;
+    /// - [`Error::Overrun`] is returned when data *is* arriving, faster than it
+    ///   is read.
     pub async fn read(&mut self) -> Result<ResultRegular, Error> {
         self.start_conversion();
 
@@ -493,12 +548,8 @@ where
     ///
     /// Returns `(data, channel, rpend)`.
     pub fn get_result_unchecked(&mut self) -> ResultRegular {
-        let result = T::regs().flt(M::CHANNEL.index()).rdatar().read();
-        ResultRegular {
-            data: sign_extend_24(result.rdata()),
-            channel: result.rdatach(),
-            pending: result.rpend(),
-        }
+        let word = T::regs().flt(M::CHANNEL.index()).rdatar().read().0;
+        ResultRegular::from_word(word)
     }
 
     /// Returns whether a regular conversion result is available.
@@ -619,7 +670,14 @@ where
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_jswstart(true));
     }
 
-    /// Start an injected conversion and read its result asynchronously.
+    /// Start an injected conversion and await its result.
+    ///
+    /// Resolves with the next [`ResultInjected`] once a conversion completes.
+    ///
+    /// # Note
+    /// Like [`FilterRegular::read`], this hangs forever if the filter is
+    /// starved (no data produced); see that method for the layered starvation
+    /// detection.
     pub async fn read(&mut self) -> Result<ResultInjected, Error> {
         self.start_conversion();
 
@@ -668,12 +726,8 @@ where
     ///
     /// Returns `(data, channel)`.
     pub fn get_result_unchecked(&mut self) -> ResultInjected {
-        let result = T::regs().flt(M::CHANNEL.index()).jdatar().read();
-
-        ResultInjected {
-            data: sign_extend_24(result.jdata()),
-            channel: result.jdatach(),
-        }
+        let word = T::regs().flt(M::CHANNEL.index()).jdatar().read().0;
+        ResultInjected::from_word(word)
     }
 
     /// Returns whether an injected conversion result is available.

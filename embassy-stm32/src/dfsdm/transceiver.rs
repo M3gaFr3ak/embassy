@@ -211,7 +211,11 @@ where
     P: PowerState,
     PS: PinSource,
 {
-    /// Get direct pointer to the DATINR register for DMA mem2mem use
+    /// Pointer to the DATINR register, for feeding samples.
+    ///
+    /// Samples can be fed either by CPU writes ([`Self::write_sample_standard`] /
+    /// [`Self::write_indat1`]) or by DMA: use this pointer as the destination of
+    /// a memory-to-peripheral transfer (e.g. [`crate::dma::WritableRingBuffer`]).
     pub fn get_datinr_as_ptr(&self) -> *mut u32 {
         T::regs().ch(M::CHANNEL.index()).datinr().as_ptr() as *mut u32
     }

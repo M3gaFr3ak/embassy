@@ -51,12 +51,31 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   is resolved after the embassy rebase onto main).
 
 - [X] **FT9 — `CkoutDivider` frequency helpers.** Added
-  `CkoutDivider::from_frequency(source, ckout_rate)` (ceiling divide so the
+  `CkoutDivider::from_frequency<T>(source, ckout_rate)` (ceiling divide so the
   actual CKOUT never exceeds the request; 2..=256 range-checked) and
-  `CkoutDivider::for_manchester(source, rate)` (CKOUT ≈ 2× the Manchester rate,
-  RM0455). Both return `Result<Self, Error>`.
+  `CkoutDivider::for_manchester<T>(source, rate)` (CKOUT ~1.5x the Manchester
+  rate, inside the RM0455 window). Both are generic over the DFSDM instance and
+  enforce the RM kernel-clock constraints (fDFSDMCLK >= 4x CKOUT for SPI, >= 6x
+  rate for Manchester) plus the 10 MHz Manchester cap, returning
+  `Err(InvalidConfig)`.
 - [X] **`Error::InvalidConfig`** variant added for out-of-range config requests
   (used by the CKOUT helpers).
+
+### DOCS
+
+- [x] **D1 — liveness contract** on `FilterRegular::read` (cross-refs on
+  `FilterInjected::read`, `RingBufferedFilter::read`, `blocking_read`): a
+  starved filter hangs; detect via borrow-connected transceivers,
+  `ClockAbsenceDetector`, and `Error::Overrun`.
+- [x] **D8 — ring word layout** on `RingBufferedFilter`: raw `u32` word =
+  `RDATA[23:8]` (24-bit), `RPEND` bit 4, `RDATACH[2:0]`; channel byte
+  load-bearing in scan mode. Added `ResultRegular::from_word` /
+  `ResultInjected::from_word` decoders (reuse the metapac `Rdatar`/`Jdatar`
+  accessors) and refactored `get_result_unchecked` onto them.
+- [x] **FT8 — `conversion_timer`** doc: measures the time of one conversion
+  (interval between first and last sample, on fDFSDMCLK), not completed
+  conversions; documented as not a reliable liveness signal (sub-Nyquist
+  aliasing).
 
 ### NITS
 4. [x] `Error` enum stray `//TODO` — resolved (no stray TODO remains; folded
