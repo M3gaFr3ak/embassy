@@ -50,6 +50,14 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   stm32h7a3zi / stm32h7b3zi / stm32h7b0ab now compile (the VERIFY `E0277 ×24`
   is resolved after the embassy rebase onto main).
 
+- [X] **FT9 — `CkoutDivider` frequency helpers.** Added
+  `CkoutDivider::from_frequency(source, ckout_rate)` (ceiling divide so the
+  actual CKOUT never exceeds the request; 2..=256 range-checked) and
+  `CkoutDivider::for_manchester(source, rate)` (CKOUT ≈ 2× the Manchester rate,
+  RM0455). Both return `Result<Self, Error>`.
+- [X] **`Error::InvalidConfig`** variant added for out-of-range config requests
+  (used by the CKOUT helpers).
+
 ### NITS
 4. [x] `Error` enum stray `//TODO` — resolved (no stray TODO remains; folded
    into FT1).
@@ -62,6 +70,17 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
 14. [x] Rename `read_regular`/`read_injected` — superseded by FT15: the
     methods are now `read()` (regular/injected halves); ring/blocking reads
     live on `RingBufferedFilter`. Nothing left to rename.
+3. [x] `Config` struct — removed (obsolete; no constructor used it).
+5. [x] AFS critical-section question — the stale commented-out `config_pins!`
+   block and the `// TODO MAYBE USE CRITICAL SECTION FOR AFS?!` comment in
+   `mod.rs` were removed; the AF assignment is one-shot (not ISR RMW), so it
+   needs no guard.
+17. [x] `FilterConfig::default()` — documented why `new(Disabled, 1)` can't
+    panic (bypass filter, unity gain, `iosr = 1` valid).
+19. [x] (declined half) `#[diagnostic::on_unimplemented]` on the DMA-channel
+    binding — declined: would require hand-writing the `Dma` trait or editing
+    the shared `dma_trait!` macro (or a non-standard glue trait). The remaining
+    half (a dual-core `!Send` note) stays open in todo.
 
 ### DATA PIPELINE — stm32-data side
 Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
@@ -83,6 +102,13 @@ Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
   embassy-supported.
 - [X] **SD8 (minor) — H7A/B DFSDM2 kernel clock mux.** DONE — added `DFSDM2SEL`
   enum (`PCLK4`/`SYS`); DFSDM2 kernel clock now derived as a mux.
+- [X] **SD11 — F7 DFSDM interrupts (generation-script regex bug).** F7
+  `DFSDM1` was registered as a peripheral but had no interrupt signals (empty
+  `p.interrupts`), so `foreach_interrupt!` emitted zero DFSDM rows and
+  `impl_dfsdm_filter_irq!` never expanded (`unused_macros` under `-D warnings`).
+  Fixed a regex in the stm32-data gen script; after metapac regen F7 now emits
+  `DFSDM1_FLT0..FLT3` (block `DFSDM_8CH_4FLT_TRG5`). Verified: `unused_macros`
+  gone on `stm32f777vi`.
 - [X] Regenerate data + metapac (after SD1-SD5, SD10); after this, the
   variants exist for F777-779, L451/452/462, L471/475/476/485/486, L552/562,
   H7B0. DONE — 394 DFSDM chips, 0 unmapped, all 13 blocks correct; metapac

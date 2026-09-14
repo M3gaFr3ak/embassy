@@ -5,180 +5,106 @@ Closed work lives in `done.md`.
 
 ## Triage
 
-1. **P1 — substantive.** T-doc (D-clause docstring semantics).
-2. **P2 — verification & examples.** mp157 on the matrix, the five example
-   gaps, the FT5 (TIM15/16/17) gate.
-3. **P3 — optional / reflect.** NITS reflect & hardening notes, FT19/FT9
-   (cosmetic helpers), housekeeping.
-4. **Dormant / info (stm32-data).** SD6, SD9, timer-break research.
+1. **P1 — substantive.** T-doc deep D-clauses: liveness (D1), ring layout (D8),
+   starvation recipe (FT8).
+2. **P2 — verify & examples.** `stm32mp157`, the FT5 break-caveat doc, five
+   example gaps.
+3. **P3 — reflect / optional.** NITS notes, FT19, housekeeping.
+4. **Dormant / info (stm32-data).** SD6, SD9.
 
 ---
 
-## Notes acute:
-### Interrupts (F7 DFSDM interrupt data gap):
-- F7 (F767/F777/F778/F779) DFSDM1 is registered as a peripheral but has no interrupt signals in stm32-data — foreach_interrupt! emits zero DFSDM rows, so impl_dfsdm_filter_irq! never expands (unused_macros under -D warnings) and no FilterInterrupt impls exist on F7. Add the DFSDM1_FLT0..FLT7 (per-filter) interrupt declarations to the F7 DFSDM1 block so interrupt/async DFSDM works there; then F7 drops off the unused_macros list.
-### FT5 gate (break-enable caveats):
-- Document the FT5 break-enable caveats in code (timer/low_level.rs, cross-ref'd from complementary_pwm.rs): on F4/F7 the AF1/AF2 DFSDM break bits aren't in the TRMs (RM0402/RM0430/RM0410) so set_break_dfsdm_enable (F4) and set_break2_dfsdm_enable (F4 + F7) are unverified on silicon; plus note the DFSDM source side (ShortCircuitDetector::assign_break_signals / AWD BreakSignals). TIM15/16/17 break remains unimplemented (tracked here, not code).
+## P1 — T-doc (deep docstring semantics)
 
-## P1 — substantive
+The module-restructure doc pass landed (every public item carries a docstring;
+`missing_docs` gate = 0 warnings). What remains is the deep hardware-semantics
+clauses below, written into the relevant docstrings (rustdoc [`Type`] links,
+§-refs where the TRM is load-bearing, `# Note`/`# Safety` rubrics; no em dashes;
+TRM content restated, not copied verbatim, ASCII punctuation only).
 
-### T-doc — full docstring pass (D-clause semantics)
+**Must-do (silent hangs / data corruption):**
 
-Absorbs D1–D13 + D14's doc clauses, FT8, FT15's doc clauses, NITS #3/#8.
-Every public item gets a real docstring; the missing_docs warnings are the
-inventory, so nothing is skipped. Formalize into rustdoc ([`Type`] links,
-§-refs where the TRM is load-bearing, `# Note`/`# Safety` rubrics; no em
-dashes). TRM content is restated, not copied verbatim: ASCII punctuation only
-(`->` not `→`, `x` not `×`, `<=` not `≤`); `§` is kept for section references
-only. Batched per module (types.rs, splits.rs, detector objects, read
-paths, dma.rs) with a missing_docs-per-module zero gate. The former D-register
-notes become the docstrings they annotate:
-
-- D1 — liveness contract on the filter read paths ("read() hangs silently iff
-  the source is starved"; layered detection: borrow-connected transceivers,
-  CKAB (FT3), CNVTIMR+timeout, overrun (FT1)).
-- D2 — assign-as-overwrite asymmetry: JCHGR instant + scan reset; RCH shadow
-  applied at next RSWSTART.
-- D3 — `start_*` semantics: requests ignored while RCIP/JCIP; regular
-  interrupted by injected restarts later, flagged by RPEND.
-- D4 — DATINR: pre-start data lost; 16- and 32-bit accesses both legal
-  (packing-mode dependent).
-- D5 — CKOUT sequencing: wait for CKOUT stopped before changing CKOUTSRC
-  (glitch); stop timing 4 sysclk / 1 sysclk + 3 audio clk; 0-20 MHz range.
-- D6 — RCONT restart quirk: CR1 write with RCONT=1 mid-conversion restarts
-  from the next conversion cycle.
-- D7 — disable semantics: DFEN=0 stops conversions and resets ISR + AWSR;
-  answer whether RDATAR/JDATAR retain their last value (doc).
+- D1 — liveness contract on the read paths: `read()` hangs silently iff the
+  source is starved; document the layered detection (borrow-connected
+  transceivers, CKAB, CNVTIMR+timeout, overrun).
 - D8 — ring word layout: one u32 = `RDATA[23:8] | RPEND | RDATACH` (JDATA
-  analog); channel byte load-bearing for scan demux; 32-bit only.
-- D9 — break cross-link: DFSDM = event→wire (BKSCD, BKAWH/BKAWL,
-  `BreakSignals`); TIM = wire→BRK enable (FT5).
-- D10 — ignore-overrun pattern on `get_*_unchecked` (both halves): unchecked +
-  EOC/JEOC poll = "always-fresh, overruns don't matter"; FT1's `Err(Overrun)`
-  for callers who care.
-- D11 — ring docs: circular-only, one-ring-per-filter (F6; "use two filters
-  for both").
-- D12 — CKAB held-set note (E2): raw 8-bit mask reads need the armed mask.
-- D13 — extremes read-to-clear: `read_maxima`/`read_minima` reset EXMAX/EXMIN
-  (+ CH fields) on read.
-- D14 (doc clauses) — AWFSEL coupling ("per-channel filter only meaningful in
-  fastmode") + the "AWFORD"→"AWFOSR" docstring fix, under FT21's new names.
-- FT8 — CNVTIMR "measures filter activity, not consumer progress" + the
-  starvation recipe (timeout + two Δt reads: frozen = starved, advancing =
-  alive-but-slow) as the `conversion_time()` docstring.
-- NITS #3 — populate `Config` docs (mod.rs:44-48) or remove the struct.
+  analog); channel byte is load-bearing for scan demux; 32-bit only.
+- FT8 — `conversion_time()` starvation recipe: CNVTIMR measures filter activity,
+  not consumer progress; two Δt reads (frozen = starved, advancing =
+  alive-but-slow).
 
-Status (2026-09): the module-restructure doc pass landed (every public item
-carries a docstring; `missing_docs` gate = 0 warnings). Still open is the deep
-D-clause semantics — D1 liveness, D8 ring layout, FT8's CNVTIMR starvation
-recipe, and the §-ref `# Note`/`# Safety` rubrics. That is the one remaining
-substantive doc item.
+**Nice-to-have:**
+
+- D2 — assign asymmetry: JCHGR instant + scan reset; RCH shadowed until next RSWSTART.
+- D3 — `start_*`: requests ignored while RCIP/JCIP; injected preempts regular (restarts, flagged RPEND).
+- D4 — DATINR: pre-start data lost; 16/32-bit accesses both legal (packing dependent).
+- D5 — CKOUT sequencing: wait for CKOUT stopped before changing CKOUTSRC (glitch); stop timing 4 sysclk / 1 sysclk + 3 audio; 0-20 MHz.
+- D6 — RCONT restart quirk: CR1 write with RCONT=1 mid-conversion restarts.
+- D7 — disable semantics: DFEN=0 stops conversions, resets ISR+AWSR; whether RDATAR/JDATAR retain last value.
+- D9 — break cross-link: DFSDM event→wire (BKSCD, BKAWH/BKAWL); TIM wire→BRK (FT5).
+- D10 — ignore-overrun pattern on the unchecked read paths.
+- D11 — ring: circular-only, one-ring-per-filter.
+- D12 — CKAB held-set: raw 8-bit mask reads need the armed mask.
+- D13 — extremes read-to-clear: `read_maxima`/`read_minima` reset EXMAX/EXMIN (+CH).
+- D14 — AWFSEL coupling (per-channel fast filter only meaningful in fast mode) + AWFORD→AWFOSR.
 
 ---
 
-## P2 — verification & examples
+## P2 — verify & examples
 
-### Verify (remaining)
+### Verify
 
-- [x] `cargo clippy` on the DFSDM chip matrix (`cargo check` + `cargo fmt` +
-  in-scope clippy all green via `./check.sh --clippy`; out-of-scope crate-wide
-  lints are ignored by design).
 - [ ] `stm32mp157` — no feature in this crate's Cargo.toml yet; revisit later.
-- [ ] FT5 gate: the matrix doubles as the gate for the optional TIM15/16/17
-  break impl.
+- [ ] FT5 break-caveat doc: `set_break_dfsdm_enable`/`set_break2_dfsdm_enable`
+  are unverified on F4 (both) and F7 (break2) — the TRMs (RM0402/RM0430/RM0410)
+  don't document the AF1/AF2 DFSDM break bits. Document this in
+  `timer/low_level.rs` (cross-ref from `complementary_pwm.rs`), and note the
+  DFSDM source side (`ShortCircuitDetector::assign_break_signals` / AWD
+  `BreakSignals`). TIM15/16/17 break remains unimplemented; the matrix doubles
+  as its gate.
 
 ### Examples
 
-- [ ] `dfsdm_parallel_dma_to_dma.rs`: exercise `read` (async) / `blocking_read`
-  with `Err(Overrun)` handling — the API exists (FT2), usage in the example
-  still to be added.
-- [ ] `dfsdm_it.rs` → `read(..)?`/Result handling.
-- [ ] New (stretch): AWD + SCD/CKAB guard example incl. `wait_for_sync()` arm
-  sequence.
-- [ ] New: parallel-ADC example (`build_parallel_adc`) — internal-ADC input,
-  complementing the existing `dfsdm_parallel_dma_to_dma.rs` CPU/DMA path.
-- [ ] `dfsdm_3phase_motor.rs` (stretch): 3-phase PWM + DFSDM — injected
-  conversions TRGO-triggered → injected ring (circular), controller reads in
-  PWM-center ISR; regular continuous + manual latest reads (ignore overrun,
-  D10); AWD fast-mode high threshold → break0 → TIMx BRK (hardware overcurrent
-  break) on one filter/channel, AWD IRQ-only on others (graceful shutdown);
-  CKAB via FT3/FT12.
+- [ ] `dfsdm_parallel_dma_to_dma.rs`: exercise `read`/`blocking_read` with
+  `Err(Overrun)` handling (API exists, usage not yet added).
+- [ ] `dfsdm_it.rs`: `read(..)?`/Result handling.
+- [ ] (stretch) AWD + SCD/CKAB guard example incl. `wait_for_sync()`.
+- [ ] parallel-ADC example (`build_parallel_adc`).
+- [ ] (stretch) `dfsdm_3phase_motor.rs`: PWM + DFSDM overcurrent break.
 
 ---
 
-## P3 — optional / reflect
+## P3 — reflect / optional
 
 ### NITS
 
-5. AFS critical-section question (mod.rs:103, `// TODO MAYBE USE CRITICAL
-   SECTION FOR AFS?!`) — fold into F1 (one critical_section strategy for all
-   RMW: CR2 + AF assignment). The configure_pins AF assignment is one-shot
-   (not ISR RMW), so it likely needs no guard — decide and drop the comment.
-11. `new_pin!(...).unwrap()` ×3 (transceiver.rs:651/663/664) — verify vs
-    embassy conventions.
-15. Reflect: `DFSDMEN` (peripheral enable) currently lives on `DfsdmCommon` —
-    consider whether the global enable belongs on the `Dfsdm` wrapper instead.
-17. `FilterConfig::default()` (filter.rs:34) calls
-    `FilterParameters::new(Disabled, 1)` — its `.expect` is provably
-    unreachable (`Disabled` → fosr=1, gain=1, total gain=1 ≤ MAX_GAIN; iosr=1
-    in 1..=256), so the default can never panic. Add a comment documenting that
-    invariant (or an infallible const default path).
-18. Packing-mode DATINR write restriction: `write_sample_standard` (INDAT0) and
-    `write_indat1` (INDAT0+INDAT1) are both exposed on every `ParallelDmaMode`
-    transceiver regardless of DATPACK — `write_indat1` on a Standard-packed
-    channel is a silent wrong write. Typemark the packing mode (or document
-    which writer matches which `DataPackingModeReduced`).
-19. Deferred hardening: `#[diagnostic::on_unimplemented]` on the DMA-channel
-    binding ("DMAx_CHy cannot service DFSDM filter M {regular|injected}"); and
-    a dual-core `!Send` note (CR1 RMW is safe single-core only). Low priority.
-20. `set_continuous` straddles the config/runtime split: it's the one
-    `FilterDisabled` static (filter.rs:225) that is also runtime-reachable,
-    since RCONT is runtime-writable — `FilterRegular::set_continuous(&mut
-    self)` (filter.rs:526) delegates back into the Disabled-scoped static,
-    while the other six config statics are DFEN=0-gated only. Harmless (thin
-    delegate); just the known exception.
-21. `set_data_packing_mode` design musing (transceiver.rs:513) — consider a
-    semantic dual-pair constructor — `new_parallel_dma_dual()` on the even
-    channel meaning "this channel and its paired successor are configured as a
-    dual-input pair" — folding the comment's intent into the API or deleting
-    the comment. Decide during the FT7/FT18 API pass.
-22. `select_awd_filter_order`/`select_awd_filter_osr` (transceiver.rs:182/191,
-    renamed per FT21) are pub consuming builders (voluntary — AWFORD/AWFOSR
-    stay at reset if untouched). Think about whether the AWD fast-mode
-    input-stage config should be **mandatory** at build time instead (required
-    constructor param or configure step), so it can't be forgotten when AWFSEL
-    fastmode is intended. Voluntary by decision for now.
+- 11. `new_pin!(...).unwrap()` ×3 (transceiver.rs) — verify vs embassy conventions.
+- 15. Reflect: `DFSDMEN` (peripheral enable) lives on `DfsdmCommon` — consider moving to the `Dfsdm` wrapper.
+- 18. Packing-mode DATINR write restriction: `write_indat1` on a Standard-packed
+  channel is a silent wrong write. Typemark the packing mode (or document).
+- 19. (remaining half) dual-core `!Send` note (CR1 RMW is single-core only).
+- 20. `set_continuous` straddles the config/runtime split (RCONT is runtime-writable); harmless, just the known exception.
+- 21. `set_data_packing_mode` design musing: semantic `new_parallel_dma_dual()` pair constructor, or drop the comment.
+- 22. `select_awd_filter_*` voluntary vs mandatory AWD fast-mode input-stage config.
 
-### FT19 (low priority) — bundle ergonomics, re-approach
+### FT19 (optional) — where-cluster bundle
 
-Decide later between two idioms for condensing the per-item `where` cluster
+Condense the per-item `where` cluster
 (`T: Instance + FilterInterrupt<M>, M: FilterMarker + InstanceEvents<T>`):
 
-- **Mini-merge**: fold `InstanceEvents` into `FilterInterrupt` as an assoc fn
-  `handle_instance_events()` (Flt0 real / Flt1..7 noop, emitted in
-  `impl_dfsdm_filter_irq!`); deletes the sibling trait and the
-  `impl_noop_instance_events!` macro; header becomes `T: FilterInstance<M>`
-  -friendly. Overturns TS5's "don't merge" note.
-- **Marker-side bundle (optional alternative)**: keep `InstanceEvents`, but
-  `trait FilterFlow<T>: FilterMarker + InstanceEvents<T> {}` + blanket impl, so
-  `M: FilterFlow<T>` elaborates both via supertraits (rust#20671 behavior);
-  headers read `T: Instance + FilterInterrupt<M>, M: FilterFlow<T>`.
-- Either is cosmetic; default to leaving the cluster as-is if neither earns its
-  churn. Verify empirically (playground + chip matrix) before committing.
+- **Mini-merge**: fold `InstanceEvents` into `FilterInterrupt` as
+  `handle_instance_events()` (Flt0 real / Flt1..7 noop); deletes the sibling
+  trait + `impl_noop_instance_events!`. Overturns TS5.
+- **Marker-side bundle**: keep `InstanceEvents`, add
+  `trait FilterFlow<T>: FilterMarker + InstanceEvents<T> {}` + blanket impl.
 
-### FT9 (optional) — `CkoutDivider::for_manchester(rate)` helper
-
-From the RM0455 Manchester formula:
-`(CKOUTDIV+1)·T_INCKOUT < T_manchester < 2·CKOUTDIV·T_INCKOUT`.
+Cosmetic either way; default to leaving the cluster as-is unless it earns its churn.
 
 ### Housekeeping
 
-- [ ] Chip-less embassy variants stay for now — decision: **no pruning yet**.
-  After the stm32-data fixes, these still have no owning chip:
-  `DFSDM_2CH_1FLT_TRG3_ADC`, `DFSDM_2CH_1FLT_DLY_TRG5_ADC`,
-  `DFSDM_4CH_2FLT_TRG3_ADC` (L451/452/462 are plain TRG3 per rm0394);
-  `DFSDM_4CH_2FLT_DLY_TRG5_ADC_HWID` is MP13-only (no MP13 chips in the chip
-  db). Revisit later.
+- [ ] Chip-less embassy variants stay (no pruning yet): `DFSDM_2CH_1FLT_TRG3_ADC`,
+  `DFSDM_2CH_1FLT_DLY_TRG5_ADC`, `DFSDM_4CH_2FLT_TRG3_ADC` (L451/452/462 are
+  plain TRG3), `DFSDM_4CH_2FLT_DLY_TRG5_ADC_HWID` (MP13-only). Revisit later.
 
 ---
 
@@ -186,16 +112,5 @@ From the RM0455 Manchester formula:
 
 Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
 
-- [ ] **SD6 (dormant) — LPTIM3_ETR ← DFSDM2_BREAK0 (H7A/B).** Blocked on
-  unmodeled LPTIM ETR input signal; not blocking anything else.
-- [ ] **SD9 (info, no action) — MP13 chips absent.** Perimap regex correct but
-  dormant.
-
-### Research note — timer break bits (F4/F7)
-
-Following have no bken enable for dfsdm bits in timers. Do research:
-
-- rm0394 — STM32L41x/42x/43x/44x/45x/46x
-- rm0402 — STM32F412
-- rm0410 — STM32F76x/77x
-- rm0430 — STM32F413/423
+- [ ] **SD6 (dormant) — LPTIM3_ETR ← DFSDM2_BREAK0 (H7A/B).** Blocked on unmodeled LPTIM ETR input.
+- [ ] **SD9 (info, no action) — MP13 chips absent.** Perimap regex correct but dormant.

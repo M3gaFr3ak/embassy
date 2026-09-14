@@ -52,6 +52,9 @@ pub enum Error {
     /// Invalid filter parameters: FOSR/IOSR out of range, or the resulting
     /// filter gain exceeds the allowed ceiling for the input width.
     InvalidFilterParameters,
+    /// Invalid configuration: a requested value (e.g. a CKOUT divider) is
+    /// outside the achievable range.
+    InvalidConfig,
 }
 
 // =============================================================================
@@ -93,17 +96,6 @@ where
         ckout_div: config::CkoutDivider,
     ) -> Self {
         let ckout = new_pin!(ckout, AfType::output(OutputType::PushPull, Speed::VeryHigh));
-
-        //         macro_rules! config_pins {
-        //     ($($pin:ident),*) => {
-        //                 critical_section::with(|_| {
-        //             $(
-        //                 set_as_af!($pin, AfType::input(Pull::None));
-        //             )*
-        //         })
-        //     };
-        // }
-        // TODO MAYBE USE CRITICAL SECTION FOR AFS?!
 
         let mut dfsdm = Self::new_inner(peri, ckout);
 

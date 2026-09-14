@@ -33,6 +33,10 @@ pub struct FilterConfig<T: Instance, M: FilterMarker> {
 
 impl<T: Instance, M: FilterMarker> Default for FilterConfig<T, M> {
     fn default() -> Self {
+        // `new` cannot panic: `Disabled` is a bypass filter with unity gain
+        // (FOSR=1, IOSR=1), so the accumulator value equals the raw input (0/1
+        // serial, at most 2^16 for 16-bit parallel), always far below the
+        // 2^31-1 ceiling; `iosr = 1` is also a valid register value.
         FilterConfig {
             filter_params: FilterParameters::new(config::FilterOrder::Disabled, 1),
             enable_continuous_regular: false,

@@ -1,7 +1,8 @@
 //! Config value types used across the driver: filter parameters, data packing
 //! and shift modes, clock/output sources, and trigger/edge configuration.
 
-use super::Error;
+use super::{Error, Instance};
+use crate::time::Hertz;
 
 // =============================================================================
 // Config types
@@ -31,6 +32,9 @@ impl From<CkoutSource> for bool {
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct CkoutDivider(u8);
 
+/// Maximum Manchester recovered-clock frequency (RM0455: 0 - 10 MHz).
+const MANCHESTER_MAX_RATE: u32 = 10_000_000;
+
 impl CkoutDivider {
     /// Create from the actual divider value (2..=256).
     /// Panics if out of range.
@@ -38,6 +42,77 @@ impl CkoutDivider {
     pub fn new(divider: u16) -> Self {
         assert!((2..=256).contains(&divider), "CKOUT divider must be 2..=256");
         Self((divider - 1) as u8)
+    }
+
+    /// Compute the divider to get a wanted CKOUT output frequency from the
+    /// CKOUT source clock.
+    ///
+    /// `source` is the CKOUT input clock (system or audio, selected by
+    /// [`CkoutSource`]); `ckout_rate` is the wanted CKOUT frequency. The
+    /// divider is rounded up so the actual CKOUT frequency never exceeds
+    /// `ckout_rate`.
+    ///
+    /// The DFSDM kernel clock (`crate::rcc::frequency::<T>()`) must be at
+    /// least 4x `ckout_rate` (SPI coding, RM0455); this is enforced here.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidConfig`] if the wanted frequency is zero, too
+    /// high relative to the kernel clock, or unreachable with the 2..=256
+    /// divider range.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the clock is not active.
+    pub fn from_frequency<T: Instance>(source: Hertz, ckout_rate: Hertz) -> Result<Self, Error> {
+        if ckout_rate.0 == 0 {
+            return Err(Error::InvalidConfig);
+        }
+        // Kernel clock (fDFSDMCLK) must be at least 4x the CKOUT rate (SPI).
+        if ckout_rate.0.saturating_mul(4) > crate::rcc::frequency::<T>().0 {
+            return Err(Error::InvalidConfig);
+        }
+        // Ceiling divide: actual = source / divider <= ckout_rate.
+        let divider = source.0.div_ceil(ckout_rate.0);
+        if (2..=256).contains(&divider) {
+            Ok(Self((divider - 1) as u8))
+        } else {
+            Err(Error::InvalidConfig)
+        }
+    }
+
+    /// Compute the divider for a Manchester data rate.
+    ///
+    /// `manchester_rate` is the expected Manchester data rate, i.e. the
+    /// recovered clock frequency (RM0455: 0 to 10 MHz and < fDFSDMCLK/6). The
+    /// divider is chosen so the Manchester period satisfies
+    /// `(CKOUTDIV + 1) x T_source < T_manchester < 2 x CKOUTDIV x T_source`
+    /// (RM0455), which puts the CKOUT output at ~1.5x the Manchester rate,
+    /// inside the valid window.
+    ///
+    /// The DFSDM kernel clock (`crate::rcc::frequency::<T>()`) must be at
+    /// least 6x the Manchester rate; this is enforced here.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidConfig`] if the rate is above 10 MHz, above
+    /// fDFSDMCLK/6, or unreachable with the 2..=256 divider range.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the clock is not active.
+    pub fn for_manchester<T: Instance>(source: Hertz, manchester_rate: Hertz) -> Result<Self, Error> {
+        if manchester_rate.0 > MANCHESTER_MAX_RATE {
+            return Err(Error::InvalidConfig);
+        }
+        // Kernel clock (fDFSDMCLK) must be at least 6x the Manchester rate.
+        if manchester_rate.0.saturating_mul(6) > crate::rcc::frequency::<T>().0 {
+            return Err(Error::InvalidConfig);
+        }
+        // CKOUT at ~1.5x the Manchester rate: comfortably inside the valid
+        // window (f_ckout/2 < f_man < f_ckout).
+        let ckout = manchester_rate.0 * 3 / 2;
+        Self::from_frequency::<T>(source, Hertz(ckout))
     }
 
     /// CKOUT disabled (register value 0).
