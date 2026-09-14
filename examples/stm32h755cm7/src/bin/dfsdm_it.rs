@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
-//! PDM mic -> DFSDM -> print each conversion result (interrupt-driven).
+//! PDM mic -> DFSDM -> print each regular conversion result.
+//!
+//! Minimal interrupt-driven example: `start_and_read()` launches and awaits one
+//! conversion, printing the sign-extended sample. No DSP or PWM.
 
 use core::mem::MaybeUninit;
 

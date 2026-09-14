@@ -1,7 +1,11 @@
 #![no_std]
 #![no_main]
 
-//! Dual (paired) parallel input -> DFSDM -> two DMA ring buffers, compared against software sums.
+//! Dual parallel input -> DFSDM -> two DMA ring buffers, verified against software sums.
+//!
+//! Like `dfsdm_dma_to_dma.rs` with dual (paired) packing: the even and odd
+//! channels feed two filters and two ring buffers, each compared against its
+//! own software integration.
 
 use core::mem::MaybeUninit;
 

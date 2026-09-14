@@ -1,7 +1,11 @@
 #![no_std]
 #![no_main]
 
-//! Parallel input via CPU writes -> DFSDM results, compared against a software sum.
+//! Parallel input via CPU writes -> DFSDM results, verified against a software sum.
+//!
+//! Writes one 16-bit sample at a time into DATINR (no DMA) and reads each
+//! integrated result, comparing against a software integration of the same
+//! samples.
 
 use core::mem::MaybeUninit;
 

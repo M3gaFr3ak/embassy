@@ -1,15 +1,21 @@
 #![no_std]
 #![no_main]
 
-//! PDM mic -> DFSDM -> beat detection -> LED PWM (injected conversions).
+//! PDM mic -> DFSDM -> beat detection -> LED PWM (injected, short-circuit blink).
+//!
+//! Awaits injected conversion results via `read()`, runs each sample through
+//! the beat-detection DSP (`dsp::LevelDsp`) and drives the LED on PB14 (TIM12).
+//! If the input short-circuits (data line stuck), the LED blinks at full
+//! brightness at 4 Hz until the input toggles again.
 
 use core::mem::MaybeUninit;
 
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
+use embassy_futures::select::{Either, select};
 use embassy_stm32::dfsdm::config::{CkoutDivider, FilterOrder, FilterParameters, InternalSpiMode};
-use embassy_stm32::dfsdm::{FilterConfig, Flt0, ResultInjected};
+use embassy_stm32::dfsdm::{Detectors, FilterConfig, Flt0, ResultInjected, ShortCircuitAssignment};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
 use embassy_stm32::peripherals::DFSDM1;
 use embassy_stm32::rcc::{self};
@@ -17,7 +23,7 @@ use embassy_stm32::time::{Hertz, khz};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::{SharedData, bind_interrupts, dfsdm};
 use embassy_stm32h755cm7_examples::dsp::{LevelDsp, Meter};
-use embassy_time::Instant;
+use embassy_time::{Instant, Timer};
 use panic_probe as _;
 
 #[unsafe(link_section = ".ram_d3.shared_data")]
@@ -121,21 +127,52 @@ async fn main(_spawner: Spawner) {
         .build(&common, Irqs)
         .enable_no_dma(&channel_mic, [&channel_mic], &flt_cfg);
 
+    let Detectors {
+        mut short_circuit,
+        clock_absence: _,
+    } = split.detectors.build(&common, Irqs);
+    short_circuit.assign_transceivers([ShortCircuitAssignment::new(&channel_mic, 12)]);
+    short_circuit.clear_flags();
+
     let mut dsp = LevelDsp::new();
     let mut meter = Meter::new();
     let mut wait_start = Instant::now();
 
     flt0.injected.start_conversion();
     loop {
-        let ResultInjected { data, .. } = flt0.injected.read().await.expect("Error");
-        flt0.injected.start_conversion();
-        let ready_at = Instant::now();
+        match select(flt0.injected.read(), short_circuit.wait_for_event()).await {
+            Either::First(result) => {
+                let ResultInjected { data, .. } = result.expect("Error");
+                let ready_at = Instant::now();
 
-        let duty = dsp.process(data, pwm_ld2.max_duty_cycle());
-        pwm_ld2.set_duty_cycle(duty);
+                let duty = dsp.process(data, pwm_ld2.max_duty_cycle());
+                pwm_ld2.set_duty_cycle(duty);
+                flt0.injected.start_conversion();
 
-        meter.record(ready_at - wait_start, Instant::now() - ready_at);
-        wait_start = Instant::now();
-        meter.report();
+                meter.record(ready_at - wait_start, Instant::now() - ready_at);
+                wait_start = Instant::now();
+                meter.report();
+            }
+            Either::Second(mask) => {
+                info!("Short circuit! Channels: {:#08b}", mask);
+                // Short-circuit: blink full brightness at 4 Hz until the input toggles again.
+                let max_duty = pwm_ld2.max_duty_cycle();
+                loop {
+                    pwm_ld2.set_duty_cycle(max_duty);
+                    Timer::after_millis(125).await;
+                    pwm_ld2.set_duty_cycle(0);
+                    Timer::after_millis(125).await;
+
+                    if short_circuit.flags() == 0 {
+                        break;
+                    }
+                    short_circuit.clear_flags();
+                }
+                short_circuit.clear_flags();
+                info!("Short circuit cleared, resuming");
+                flt0.injected.start_conversion();
+                wait_start = Instant::now();
+            }
+        }
     }
 }

@@ -100,7 +100,7 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   conversions. The launch-and-await convenience moved to
   `start_and_read()` (= `start_conversion()` + `read()`). Examples updated:
   `dfsdm_it.rs` uses `start_and_read()`; `dfsdm_pwm_it.rs`/
-  `dfsdm_pwm_it_injected.rs` already used the explicit `start_conversion()` +
+  `dfsdm_pwm_injected_sc.rs` already used the explicit `start_conversion()` +
   `read()` pipeline and now behave correctly (the injected example also fixed a
   stray `regular` start that should have been `injected`).
 

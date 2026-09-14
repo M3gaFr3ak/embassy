@@ -1,7 +1,11 @@
 #![no_std]
 #![no_main]
 
-//! PDM mic -> DFSDM -> beat detection -> LED PWM (interrupt-driven read).
+//! PDM mic -> DFSDM -> beat detection -> LED PWM (interrupt-driven regular read).
+//!
+//! Awaits regular conversion results via `read()`, runs each sample through the
+//! beat-detection DSP (`dsp::LevelDsp`) and drives the LED on PB14 (TIM12). A
+//! conversion is started before the loop and re-started after each read.
 
 use core::mem::MaybeUninit;
 

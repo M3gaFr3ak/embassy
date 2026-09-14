@@ -1,7 +1,11 @@
 #![no_std]
 #![no_main]
 
-//! Parallel input -> DFSDM -> DMA ring buffer, compared against a software sum.
+//! Parallel input -> DFSDM -> DMA ring buffer, verified against a software sum.
+//!
+//! Feeds a deterministic 16-bit stream into DATINR via MDMA, reads integrated
+//! results from a DMA ring buffer and compares each against a software
+//! integration of the same samples.
 
 use core::mem::MaybeUninit;
 

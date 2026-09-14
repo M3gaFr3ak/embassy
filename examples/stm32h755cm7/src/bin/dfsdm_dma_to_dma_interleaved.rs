@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
-//! Interleaved parallel input -> DFSDM -> DMA ring buffer, compared against a software sum.
+//! Interleaved parallel input -> DFSDM -> DMA ring buffer, verified against a software sum.
+//!
+//! Like `dfsdm_dma_to_dma.rs` with interleaved packing: two 16-bit samples per
+//! u32 word, both into channel 0.
 
 use core::mem::MaybeUninit;
 

@@ -3,10 +3,10 @@
 
 //! Triggered injected conversions on the STM32H755 (CM7).
 //!
-//! Clone of `dfsdm_pwm_it_injected.rs` with the software conversion start
-//! replaced by an external trigger: TIM1 TRGO (update event) launches each
-//! injected conversion, so `flt0.injected.read()` simply awaits the next
-//! triggered result.
+//! Like `dfsdm_pwm_injected_sc.rs` without the short-circuit handling: the
+//! software conversion start is replaced by an external trigger — TIM1 TRGO
+//! (update event) launches each injected conversion, so `flt0.injected.read()`
+//! simply awaits the next triggered result.
 //!
 //! The filter produces ~400 Hz of conversions (2 MHz CKOUT / (FOSR=100 *
 //! IOSR=50)); TIM1 is set slightly slower (350 Hz) so each conversion finishes

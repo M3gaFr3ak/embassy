@@ -2,6 +2,10 @@
 #![no_main]
 
 //! DFSDM short-circuit detector demo.
+//!
+//! Arms the mic channel with a short-circuit threshold and prints the channel
+//! bitmap each time the detector fires (data line stuck longer than the
+//! threshold).
 
 use core::mem::MaybeUninit;
 

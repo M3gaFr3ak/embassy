@@ -2,6 +2,9 @@
 #![no_main]
 
 //! DFSDM clock-absence detector demo.
+//!
+//! Arms the mic channel for clock-absence detection and prints the channel
+//! bitmap each time the source clock is missing.
 
 use core::mem::MaybeUninit;
 

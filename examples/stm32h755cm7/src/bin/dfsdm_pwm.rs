@@ -1,7 +1,11 @@
 #![no_std]
 #![no_main]
 
-//! PDM mic -> DFSDM -> beat detection -> LED PWM (polling, no interrupts).
+//! PDM mic -> DFSDM -> beat detection -> LED PWM (polling).
+//!
+//! Polls regular conversion results with `try_get_result()` (no interrupt
+//! waker), runs each sample through the beat-detection DSP
+//! (`dsp::LevelDsp`) and drives the LED on PB14 (TIM12).
 
 use core::mem::MaybeUninit;
 
