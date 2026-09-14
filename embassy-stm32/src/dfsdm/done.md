@@ -94,6 +94,15 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
 - [X] **`blocking_read` doc corrected.** It returns on the first non-empty read
   (partial, up to half capacity), matching `RingBufferedAdc::blocking_read`;
   the doc previously claimed it spins until `buf.len()` samples are available.
+- [X] **`read` / `start_and_read` split.** `FilterRegular::read` and
+  `FilterInjected::read` no longer launch a conversion: they now only register
+  the waker and await the next result, so they work with externally triggered
+  conversions. The launch-and-await convenience moved to
+  `start_and_read()` (= `start_conversion()` + `read()`). Examples updated:
+  `dfsdm_it.rs` uses `start_and_read()`; `dfsdm_pwm_it.rs`/
+  `dfsdm_pwm_it_injected.rs` already used the explicit `start_conversion()` +
+  `read()` pipeline and now behave correctly (the injected example also fixed a
+  stray `regular` start that should have been `injected`).
 
 ### DOCS
 

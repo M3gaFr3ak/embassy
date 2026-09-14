@@ -132,7 +132,7 @@ async fn main(_spawner: Spawner) {
 
     println!("Go?");
     loop {
-        if let Ok(ResultRegular { data, .. }) = flt0.regular.read().await {
+        if let Ok(ResultRegular { data, .. }) = flt0.regular.start_and_read().await {
             println!("There we go! {}", data);
         }
     }

@@ -480,14 +480,18 @@ where
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_rswstart(true));
     }
 
-    /// Start a regular conversion and await its result.
+    /// Await the next regular conversion result.
     ///
-    /// Resolves with the next [`ResultRegular`] once a conversion completes.
+    /// Does not start a conversion: the conversion must already be running,
+    /// started by an external trigger, or started via
+    /// [`start_and_read`](Self::start_and_read). Resolves with the next
+    /// [`ResultRegular`] once a conversion completes.
     ///
     /// # Note
     /// A starved filter hangs forever: if the assigned transceiver produces no
-    /// data (no modulator, dead clock, stalled source), no conversion completes
-    /// and this future stays pending indefinitely. Detect starvation in layers:
+    /// data (no modulator, dead clock, stalled source, or no trigger), no
+    /// conversion completes and this future stays pending indefinitely. Detect
+    /// starvation in layers:
     ///
     /// - the transceiver is borrowed for the filter's lifetime, so the source
     ///   cannot be dropped from under you (type system);
@@ -495,8 +499,6 @@ where
     /// - [`Error::Overrun`] is returned when data *is* arriving, faster than it
     ///   is read.
     pub async fn read(&mut self) -> Result<ResultRegular, Error> {
-        self.start_conversion();
-
         poll_fn(|cx| {
             FilterRegs::<T, M>::set_regular_end_of_conversion_interrupt(false);
             FilterRegs::<T, M>::set_regular_overrun_interrupt(false);
@@ -513,6 +515,16 @@ where
             }
         })
         .await
+    }
+
+    /// Start a regular conversion and await its result.
+    ///
+    /// Equivalent to [`start_conversion`](Self::start_conversion) followed by
+    /// [`read`](Self::read): the read future waits for the conversion it just
+    /// launched.
+    pub async fn start_and_read(&mut self) -> Result<ResultRegular, Error> {
+        self.start_conversion();
+        self.read().await
     }
 
     /// Attempts to read the current regular conversion result.
@@ -670,17 +682,18 @@ where
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_jswstart(true));
     }
 
-    /// Start an injected conversion and await its result.
+    /// Await the next injected conversion result.
     ///
-    /// Resolves with the next [`ResultInjected`] once a conversion completes.
+    /// Does not start a conversion: the conversion must already be running,
+    /// started by an external trigger, or started via
+    /// [`start_and_read`](Self::start_and_read). Resolves with the next
+    /// [`ResultInjected`] once a conversion completes.
     ///
     /// # Note
     /// Like [`FilterRegular::read`], this hangs forever if the filter is
-    /// starved (no data produced); see that method for the layered starvation
-    /// detection.
+    /// starved (no data produced, or no trigger); see that method for the
+    /// layered starvation detection.
     pub async fn read(&mut self) -> Result<ResultInjected, Error> {
-        self.start_conversion();
-
         poll_fn(|cx| {
             FilterRegs::<T, M>::set_injected_end_of_conversion_interrupt(false);
             FilterRegs::<T, M>::set_injected_overrun_interrupt(false);
@@ -698,6 +711,16 @@ where
             }
         })
         .await
+    }
+
+    /// Start an injected conversion and await its result.
+    ///
+    /// Equivalent to [`start_conversion`](Self::start_conversion) followed by
+    /// [`read`](Self::read): the read future waits for the conversion it just
+    /// launched.
+    pub async fn start_and_read(&mut self) -> Result<ResultInjected, Error> {
+        self.start_conversion();
+        self.read().await
     }
 
     /// Attempts to read the current injected conversion result.

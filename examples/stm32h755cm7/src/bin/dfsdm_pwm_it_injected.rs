@@ -195,8 +195,10 @@ async fn main(_spawner: Spawner) {
     let mut stats_window_start = Instant::now();
     const STATS_INTERVAL_US: u64 = 1_000_000; // report every 1s
 
+    flt0.injected.start_conversion();
     loop {
         let ResultInjected { data, .. } = flt0.injected.read().await.expect("Error");
+        flt0.injected.start_conversion();
 
         let result_ready_at = Instant::now();
         let wait_dur = result_ready_at - wait_start;
@@ -250,8 +252,6 @@ async fn main(_spawner: Spawner) {
         // 6. PWM Output, clamped defensively against max_duty_cycle
         let duty = scaled.min(max_duty);
         pwm_ld2.set_duty_cycle(duty);
-
-        flt0.regular.start_conversion();
 
         let processing_done_at = Instant::now();
         let busy_dur = processing_done_at - result_ready_at;
