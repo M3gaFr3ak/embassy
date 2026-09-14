@@ -53,8 +53,9 @@ ASCII punctuation only):
 
 ### Examples
 
-- [ ] `dfsdm_parallel_dma_to_dma.rs`: exercise `read`/`blocking_read` with
-  `Err(Overrun)` handling (API exists, usage not yet added).
+- [ ] `dfsdm_dma_to_dma.rs`: `Err(Overrun)` recovery and `blocking_read` usage —
+  the exact `read` path is now shown (with `.unwrap()` and a `PASS`/`FAIL`
+  check); overrun handling and the blocking counterpart are not yet exercised.
 - [ ] `dfsdm_it.rs`: `read(..)?`/Result handling.
 - [ ] (stretch) AWD + SCD/CKAB guard example incl. `wait_for_sync()`.
 - [ ] parallel-ADC example (`build_parallel_adc`).

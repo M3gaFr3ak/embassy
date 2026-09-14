@@ -176,8 +176,11 @@ where
         self.ring_buf.read_exact(buf).await.map_err(remap_dma_error)
     }
 
-    /// Blocking counterpart of [`read`](Self::read): spins until `buf.len()`
-    /// samples are available, with the same half-capacity requirement.
+    /// Blocking counterpart of [`read`](Self::read): waits until at least one
+    /// sample is available, then returns whatever is currently ready (at most
+    /// `buf.len()`, which must equal half of
+    /// [`capacity`](Self::capacity)). Returns [`Error::Overrun`] if the buffer
+    /// overran.
     ///
     /// Like [`read`](Self::read), this never returns if the filter is starved.
     pub fn blocking_read(&mut self, buf: &mut [u32]) -> Result<usize, Error> {

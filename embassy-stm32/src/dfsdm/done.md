@@ -77,10 +77,23 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   `set_offset(&mut self, [u32; 2])` and `disable()`.
 - [X] **`set_offset` builder split** — `&mut self` on `Enabled`, `self -> Self`
   on `Disabled`, matching `set_data_right_shift`/`select_awd_filter_*`.
-- [X] **`dfsdm_parallel_dma_to_dma_dual.rs`** — made workable: dual pair, two
-  filters (flt0 on the even channel, flt1 on the odd), two ring buffers, an MDMA
-  mem2mem feed into `pair.get_datinr_as_ptr()`, reading both channels and
-  printing the amounts.
+- [X] **Parallel-input examples restructured.** One per packing mode —
+  `dfsdm_dma_to_dma.rs` (Standard), `dfsdm_dma_to_dma_interleaved.rs`
+  (Interleaved), `dfsdm_dma_to_dma_dual.rs` (Dual) — plus `dfsdm_cpu_write.rs`
+  (CPU `write` feed). Each feeds a deterministic 16-bit pseudo-random stream
+  (sized from `IOSR`) and manually integrates it in software (sum of `IOSR`
+  sign-extended samples) to compare against the DFSDM output; `IOSR` is a single
+  constant so the filter, source size and manual model toggle together.
+- [X] **Example comparison hardened.** The DMA examples now read with
+  `RingBufferedFilter::read` (async `read_exact`) instead of the `read_latest`
+  poll loop — `read_latest` consumes and discards older data, so partial reads
+  were being overwritten and the `n >= N_OUT` poll could hang. Buffers sized
+  `2 * N_OUT` (half-capacity read of `N_OUT`, matching the ADC
+  `RingBufferedAdc` convention). All four examples assert per-output equality
+  against the manual sum and emit a final `PASS`/`FAIL`.
+- [X] **`blocking_read` doc corrected.** It returns on the first non-empty read
+  (partial, up to half capacity), matching `RingBufferedAdc::blocking_read`;
+  the doc previously claimed it spins until `buf.len()` samples are available.
 
 ### DOCS
 
@@ -302,13 +315,13 @@ Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
     including paused/stopped rings. "Read what's there" goes through the
     ring's methods. Dropping the ring releases the borrow (and the DMA
     channel) and manual reads return (NLL confirmed empirically in
-    `dfsdm_parallel_dma_to_dma.rs`).
+    `dfsdm_dma_to_dma.rs`).
   - NoDma halves cannot create a ring — `ring_buffered` lives on the
     `RegDma`/`InjDma` halves only; manual reads are the only path.
   - CR1 touchers: nothing new needed — conversion starters are `&mut self`
     methods on the half, so the borrow alone blocks them while a ring lives;
     `start_regular_conversion` before ring creation remains the working
-    pattern (example `dfsdm_parallel_dma_to_dma.rs`:94-95).
+    pattern (example `dfsdm_dma_to_dma.rs`).
   - `DmaMode` typestate upgraded beyond the record's wording: it remains the
     RDMAEN/JDMAEN config carrier (hardware quirk: only one of the two
     enable bits is ever set) AND gained the ring-side discriminator role
@@ -518,9 +531,9 @@ Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
   - Open flags (intentional): the two `//TODO clear overrun flag???`
     comments in `read`/`blocking_read` mark FT1's ROVRF/JOVRF pre-check
     (deliberately not done here); flag-branching ISR work is FT1 too.
-- [x] `dfsdm_parallel_dma_to_dma.rs` → method-built ring (`flt0.reg
+- [x] `dfsdm_dma_to_dma.rs` → method-built ring (`flt0.reg
   .ring_buffered(..)`): uses `start()` + `start_conversion()` +
-  `read_latest` loop (2026-09).
+  `read` (exact half-capacity read) loop (2026-09).
 - [x] **FT1 — Overrun, propagated everywhere** (RM0455 §33.5, Table 254:
   "data not read and overwritten by a new conversion"; JOVRF/ROVRF cleared via
   ICR write-1, enabled by JOVRIE/ROVRIE). DONE (2026-01).
