@@ -126,6 +126,14 @@ where
         core::mem::forget(self);
         Transceiver::new(common)
     }
+
+    /// Set the transceiver's offset.
+    pub fn set_offset(&mut self, offset: u32) {
+        T::regs()
+            .ch(M::CHANNEL.index())
+            .cfgr2()
+            .modify(|w| w.set_offset(offset));
+    }
 }
 
 impl<'a, 'd, T, M, S, MODE, PS> Transceiver<'a, 'd, T, M, S, MODE, PS, Enabled>
@@ -201,9 +209,18 @@ where
             .modify(|w| w.set_awfosr(osr.into()));
         self
     }
+
+    /// Set the transceiver's offset.
+    pub fn set_offset(self, offset: u32) -> Self {
+        T::regs()
+            .ch(M::CHANNEL.index())
+            .cfgr2()
+            .modify(|w| w.set_offset(offset));
+        self
+    }
 }
 
-impl<'a, 'd, T, M, S, PS, P> Transceiver<'a, 'd, T, M, S, ParallelDmaMode, PS, P>
+impl<'a, 'd, T, M, S, PS, P> Transceiver<'a, 'd, T, M, S, ParallelStandard, PS, P>
 where
     T: Instance,
     M: TransceiverMarker + NextChannelForInstance<T>,
@@ -211,33 +228,45 @@ where
     P: PowerState,
     PS: PinSource,
 {
-    /// Pointer to the DATINR register, for feeding samples.
+    /// Pointer to the DATINR register, for feeding samples via DMA.
     ///
-    /// Samples can be fed either by CPU writes ([`Self::write_sample_standard`] /
-    /// [`Self::write_indat1`]) or by DMA: use this pointer as the destination of
-    /// a memory-to-peripheral transfer (e.g. [`crate::dma::WritableRingBuffer`]).
-    /// The word layout follows the configured packing mode: one 16-bit sample
-    /// per word in Standard, two in Interleaved/Dual.
+    /// Use this as the destination of a memory-to-peripheral transfer (e.g.
+    /// [`crate::dma::WritableRingBuffer`]); one 16-bit sample per word.
     pub fn get_datinr_as_ptr(&self) -> *mut u32 {
         T::regs().ch(M::CHANNEL.index()).datinr().as_ptr() as *mut u32
     }
 
-    /// Write one sample into the DATINR register (Standard packing, DATPACK = 0).
+    /// Write one sample into the DATINR register (Standard packing).
     ///
-    /// Loads `data` into `INDAT0[15:0]`; the upper `INDAT1[15:0]` field is ignored
-    /// and write-protected in this mode. One 16-bit sample per write.
-    pub fn write_sample_standard(&self, data: u16) {
+    /// Loads `data` into `INDAT0[15:0]`; the upper `INDAT1[15:0]` field is
+    /// ignored and write-protected in this mode. One 16-bit sample per write.
+    pub fn write(&self, data: u16) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| w.set_indat0(data));
     }
+}
 
-    /// Write two samples into the DATINR register (Interleaved or Dual packing).
+impl<'a, 'd, T, M, S, PS, P> Transceiver<'a, 'd, T, M, S, ParallelInterleaved, PS, P>
+where
+    T: Instance,
+    M: TransceiverMarker + NextChannelForInstance<T>,
+    S: PinSet,
+    P: PowerState,
+    PS: PinSource,
+{
+    /// Pointer to the DATINR register, for feeding samples via DMA.
     ///
-    /// Loads `data[0]` into `INDAT0[15:0]` and `data[1]` into `INDAT1[15:0]`. In
-    /// Interleaved packing (DATPACK = 1) both samples go to channel `y`; in Dual
-    /// packing (DATPACK = 2, even channels only) INDAT0 goes to channel `y` and
-    /// INDAT1 is copied by the hardware into channel `y + 1`. Two 16-bit samples
-    /// per 32-bit write.
-    pub fn write_indat1(&self, data: [u16; 2]) {
+    /// Use this as the destination of a memory-to-peripheral transfer (e.g.
+    /// [`crate::dma::WritableRingBuffer`]); two 16-bit samples per word.
+    pub fn get_datinr_as_ptr(&self) -> *mut u32 {
+        T::regs().ch(M::CHANNEL.index()).datinr().as_ptr() as *mut u32
+    }
+
+    /// Write two samples into the DATINR register (Interleaved packing).
+    ///
+    /// Loads `data[0]` into `INDAT0[15:0]` and `data[1]` into `INDAT1[15:0]`;
+    /// both are read sequentially by the same filter on channel `y`. Two 16-bit
+    /// samples per 32-bit write.
+    pub fn write(&self, data: [u16; 2]) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| {
             w.set_indat0(data[0]);
             w.set_indat1(data[1]);
@@ -257,14 +286,6 @@ where
     /// Enables or disables the transceiver (CHEN).
     pub(crate) fn set_enabled(enabled: bool) {
         T::regs().ch(M::CHANNEL.index()).cfgr1().modify(|w| w.set_chen(enabled));
-    }
-
-    /// Set the transceiver's offset.
-    pub fn set_offset(&mut self, offset: u32) {
-        T::regs()
-            .ch(M::CHANNEL.index())
-            .cfgr2()
-            .modify(|w| w.set_offset(offset));
     }
 
     /// Read the analog watchdog data for this transceiver, converted by the
@@ -306,13 +327,133 @@ where
     }
 }
 
-/// The two transceivers returned by
-/// [`TransceiverBuilder::build_parallel_dma_dual`]: this channel (`M`/`S`, owns
-/// the DATINR register) and its paired successor (`MN`/`SN`, reads INDAT1).
-pub type ParallelDmaPair<'a, 'd, T, M, S, MN, SN> = (
-    Transceiver<'a, 'd, T, M, S, ParallelDmaMode, OwnPins, Disabled>,
-    Transceiver<'a, 'd, T, MN, SN, ParallelDmaMode, OwnPins, Disabled>,
-);
+/// A dual-mode parallel-input pair, disabled and ready to configure.
+pub struct ParallelPairDisabled<'a, 'd, T, M, S, MN, SN>
+where
+    T: Instance,
+    M: TransceiverMarker + NextChannelForInstance<T>,
+    S: PinSet,
+    MN: TransceiverMarker + NextChannelForInstance<T>,
+    SN: PinSet,
+{
+    even: Transceiver<'a, 'd, T, M, S, ParallelPaired, OwnPins, Disabled>,
+    odd: Transceiver<'a, 'd, T, MN, SN, ParallelPaired, OwnPins, Disabled>,
+}
+
+impl<'a, 'd, T, M, S, MN, SN> ParallelPairDisabled<'a, 'd, T, M, S, MN, SN>
+where
+    T: Instance,
+    M: TransceiverMarker + NextChannelForInstance<T>,
+    S: PinSet,
+    MN: TransceiverMarker + NextChannelForInstance<T>,
+    SN: PinSet,
+{
+    /// Set the data right-shift factor for both channels (`[0]` = even, `[1]` = odd).
+    pub fn set_data_right_shift(self, shifts: [config::DataRightShift; 2]) -> Self {
+        let [even, odd] = shifts;
+        let ParallelPairDisabled { even: e, odd: o } = self;
+        ParallelPairDisabled {
+            even: e.set_data_right_shift(even),
+            odd: o.set_data_right_shift(odd),
+        }
+    }
+
+    /// Set the analog watchdog filter order for both channels (`[0]` = even, `[1]` = odd).
+    pub fn select_awd_filter_order(self, orders: [config::AwdFilterOrder; 2]) -> Self {
+        let [even, odd] = orders;
+        let ParallelPairDisabled { even: e, odd: o } = self;
+        ParallelPairDisabled {
+            even: e.select_awd_filter_order(even),
+            odd: o.select_awd_filter_order(odd),
+        }
+    }
+
+    /// Set the analog watchdog filter OSR for both channels (`[0]` = even, `[1]` = odd).
+    pub fn select_awd_filter_osr(self, osrs: [config::AwdFilterOsr; 2]) -> Self {
+        let [even, odd] = osrs;
+        let ParallelPairDisabled { even: e, odd: o } = self;
+        ParallelPairDisabled {
+            even: e.select_awd_filter_osr(even),
+            odd: o.select_awd_filter_osr(odd),
+        }
+    }
+
+    /// Set the offset for both channels (`[0]` = even, `[1]` = odd).
+    pub fn set_offset(self, offsets: [u32; 2]) -> Self {
+        let [even, odd] = offsets;
+        let ParallelPairDisabled { even: e, odd: o } = self;
+        ParallelPairDisabled {
+            even: e.set_offset(even),
+            odd: o.set_offset(odd),
+        }
+    }
+
+    /// Enable both channels.
+    pub fn enable(self) -> ParallelPair<'a, 'd, T, M, S, MN, SN> {
+        let ParallelPairDisabled { even, odd } = self;
+        ParallelPair {
+            even: even.enable(),
+            odd: odd.enable(),
+        }
+    }
+}
+
+/// An enabled dual-mode parallel-input pair.
+pub struct ParallelPair<'a, 'd, T, M, S, MN, SN>
+where
+    T: Instance,
+    M: TransceiverMarker + NextChannelForInstance<T>,
+    S: PinSet,
+    MN: TransceiverMarker + NextChannelForInstance<T>,
+    SN: PinSet,
+{
+    /// Even transceiver (channel `y`), Dual packing, owns the DATINR register.
+    pub even: Transceiver<'a, 'd, T, M, S, ParallelPaired, OwnPins, Enabled>,
+    /// Odd transceiver (channel `y + 1`), Standard packing, fed by the auto-copy.
+    pub odd: Transceiver<'a, 'd, T, MN, SN, ParallelPaired, OwnPins, Enabled>,
+}
+
+impl<'a, 'd, T, M, S, MN, SN> ParallelPair<'a, 'd, T, M, S, MN, SN>
+where
+    T: Instance,
+    M: TransceiverMarker + NextChannelForInstance<T>,
+    S: PinSet,
+    MN: TransceiverMarker + NextChannelForInstance<T>,
+    SN: PinSet,
+{
+    /// Write two samples: `data[0]` to channel `y` (INDAT0) and `data[1]` to
+    /// channel `y + 1` (INDAT1, copied by the hardware into the odd channel's
+    /// INDAT0).
+    pub fn write(&self, data: [u16; 2]) {
+        T::regs().ch(M::CHANNEL.index()).datinr().write(|w| {
+            w.set_indat0(data[0]);
+            w.set_indat1(data[1]);
+        });
+    }
+
+    /// Pointer to the even channel's DATINR register, for feeding via DMA.
+    ///
+    /// Each `u32` DMA word packs two samples: `(data[1] as u32) << 16 | data[0]
+    /// as u32`.
+    pub fn get_datinr_as_ptr(&self) -> *mut u32 {
+        T::regs().ch(M::CHANNEL.index()).datinr().as_ptr() as *mut u32
+    }
+
+    /// Set the offset for both channels (`[0]` = even, `[1]` = odd).
+    pub fn set_offset(&mut self, offsets: [u32; 2]) {
+        self.even.set_offset(offsets[0]);
+        self.odd.set_offset(offsets[1]);
+    }
+
+    /// Disable both channels.
+    pub fn disable(self) -> ParallelPairDisabled<'a, 'd, T, M, S, MN, SN> {
+        let ParallelPair { even, odd } = self;
+        ParallelPairDisabled {
+            even: even.disable(),
+            odd: odd.disable(),
+        }
+    }
+}
 
 /// Builder for a [`Transceiver`]; declare pins, then call a `build_*` to finish.
 pub struct TransceiverBuilder<T, M, C, S, SN>
@@ -355,38 +496,48 @@ where
         Transceiver::new(common)
     }
 
-    /// Parallel input from CPU/DMA writes to CHyDATINR (DATMPX=2).
-    /// No CKOUT, no pins needed. Serial pins declared on this transceiver
-    /// are disconnected (the builder's Flexes drop here - they're unused
-    /// in this mode).
-    pub fn build_parallel_dma<'a, 'd>(
+    /// Parallel input from CPU/DMA writes to CHyDATINR (DATMPX = 2), Standard
+    /// packing. No CKOUT, no pins needed; serial pins declared on this
+    /// transceiver are disconnected (the builder's Flexes drop here).
+    pub fn build_parallel_standard<'a, 'd>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,
-        packing_mode: config::DataPackingModeReduced,
-    ) -> Transceiver<'a, 'd, T, M, S, ParallelDmaMode, OwnPins, Disabled> {
+    ) -> Transceiver<'a, 'd, T, M, S, ParallelStandard, OwnPins, Disabled> {
         self.select_channel_input(config::ChannelInput::Same);
         self.select_data_mux_input(config::InputDataMux::InternalRegisterWrite);
-        self.set_data_packing_mode(packing_mode.into());
+        self.set_data_packing_mode(config::DataPackingMode::Standard);
         Transceiver::new(common)
     }
 
-    /// Create a dual-mode DMA pair.
+    /// Parallel input from CPU/DMA writes to CHyDATINR (DATMPX = 2), Interleaved
+    /// packing. No CKOUT, no pins needed; serial pins declared on this
+    /// transceiver are disconnected (the builder's Flexes drop here).
+    pub fn build_parallel_interleaved<'a, 'd>(
+        mut self,
+        common: &'a DfsdmCommon<'d, T, Enabled>,
+    ) -> Transceiver<'a, 'd, T, M, S, ParallelInterleaved, OwnPins, Disabled> {
+        self.select_channel_input(config::ChannelInput::Same);
+        self.select_data_mux_input(config::InputDataMux::InternalRegisterWrite);
+        self.set_data_packing_mode(config::DataPackingMode::Interleaved);
+        Transceiver::new(common)
+    }
+
+    /// Create a dual-mode parallel-input pair.
     ///
-    /// Returns the even transceiver `M` (Dual packing, owns the DATINR register)
-    /// and the odd neighbor `MN` (Standard packing). Feed both samples by
-    /// writing the *even* transceiver with [`Transceiver::write_indat1`]: INDAT0
-    /// goes to channel `y` and INDAT1 is copied by the hardware into channel
-    /// `y + 1` (the odd transceiver's INDAT0). The odd transceiver is fed by
-    /// that copy, so do not write it directly.
+    /// Returns a disabled [`ParallelPairDisabled`]: the even transceiver `M`
+    /// (Dual packing, owns the DATINR register) and the odd neighbor `MN`
+    /// (Standard packing). Configure it, then [`ParallelPairDisabled::enable`];
+    /// feed both samples via [`ParallelPair::write`] (INDAT0 goes to channel
+    /// `y`, INDAT1 is copied by the hardware into channel `y + 1`).
     ///
     /// Two filters must be configured - one on `M` (reads INDAT0) and one on
     /// `MN` (reads the copied INDAT0) - or the register won't drain and you'll
     /// get overrun errors.
-    pub fn build_parallel_dma_dual<'a, 'd, MN, SNN>(
+    pub fn build_parallel_dual<'a, 'd, MN, SNN>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,
         mut neighbor: TransceiverBuilder<T, MN, C, SN, SNN>,
-    ) -> ParallelDmaPair<'a, 'd, T, M, S, MN, SN>
+    ) -> ParallelPairDisabled<'a, 'd, T, M, S, MN, SN>
     where
         M: DualPackingAllowed + NextChannelForInstance<T, Next = MN>,
         MN: TransceiverMarker + NextChannelForInstance<T>,
@@ -398,7 +549,10 @@ where
         neighbor.select_data_mux_input(config::InputDataMux::InternalRegisterWrite);
         self.set_data_packing_mode(config::DataPackingMode::Dual);
         neighbor.set_data_packing_mode(config::DataPackingMode::Standard);
-        (Transceiver::new(common), Transceiver::new(common))
+        ParallelPairDisabled {
+            even: Transceiver::new(common),
+            odd: Transceiver::new(common),
+        }
     }
 
     /// Manchester-coded input over this transceiver's own DATIN pin (SITP = 2/3,

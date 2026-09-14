@@ -39,10 +39,7 @@ async fn main(_spawner: Spawner) {
         )
     });
 
-    let channel_mic = split
-        .ch0
-        .build_parallel_dma(&common, dfsdm::config::DataPackingModeReduced::Interleaved)
-        .enable();
+    let channel_mic = split.ch0.build_parallel_interleaved(&common).enable();
 
     let filter_params =
         FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 100 }, 50).expect("This is inside the bounds");

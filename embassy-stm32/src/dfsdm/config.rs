@@ -375,24 +375,6 @@ impl From<PulsesToSkip> for u8 {
 // Types specifically used for pub config
 // =============================================================================
 
-/// [`DataPackingMode`] restricted to non-dual modes
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum DataPackingModeReduced {
-    /// See [`DataPackingMode::Standard`]
-    Standard,
-    /// See [`DataPackingMode::Interleaved`]
-    Interleaved,
-}
-
-impl From<DataPackingModeReduced> for DataPackingMode {
-    fn from(mode: DataPackingModeReduced) -> Self {
-        match mode {
-            DataPackingModeReduced::Standard => Self::Standard,
-            DataPackingModeReduced::Interleaved => Self::Interleaved,
-        }
-    }
-}
-
 /// SPI edge mode
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SpiMode {

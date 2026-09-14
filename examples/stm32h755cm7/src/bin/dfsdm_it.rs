@@ -6,9 +6,7 @@ use core::mem::MaybeUninit;
 use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_stm32::dfsdm::config::{
-    CkoutDivider, DataRightShift, FilterOrder, FilterParameters, InternalSpiMode,
-};
+use embassy_stm32::dfsdm::config::{CkoutDivider, DataRightShift, FilterOrder, FilterParameters, InternalSpiMode};
 use embassy_stm32::dfsdm::{FilterConfig, Flt0, ResultRegular};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
 use embassy_stm32::peripherals::DFSDM1;

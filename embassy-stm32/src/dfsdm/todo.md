@@ -68,11 +68,15 @@ ASCII punctuation only):
 
 - 11. `new_pin!(...).unwrap()` ×3 (transceiver.rs) — verify vs embassy conventions.
 - 15. Reflect: `DFSDMEN` (peripheral enable) lives on `DfsdmCommon` — consider moving to the `Dfsdm` wrapper.
-- 18. Packing-mode DATINR write restriction: `write_indat1` on a Standard-packed
-  channel is a silent wrong write. Typemark the packing mode (or document).
+- 18. [x] Packing-mode DATINR write restriction — resolved by typestate: the
+  parallel-input modes (`ParallelStandard`/`ParallelInterleaved`/`ParallelPaired`)
+  each gate their own `write` signature, so a Standard channel can't receive a
+  two-sample write and a paired channel has no write at all.
 - 19. (remaining half) dual-core `!Send` note (CR1 RMW is single-core only).
 - 20. `set_continuous` straddles the config/runtime split (RCONT is runtime-writable); harmless, just the known exception.
-- 21. `set_data_packing_mode` design musing: semantic `new_parallel_dma_dual()` pair constructor, or drop the comment.
+- 21. [x] `set_data_packing_mode` design musing — resolved by the parallel-input
+  typestate: `build_parallel_dual()` returns `ParallelPairDisabled` and the dual
+  write lives on `ParallelPair::write`.
 - 22. `select_awd_filter_*` voluntary vs mandatory AWD fast-mode input-stage config.
 
 ### FT19 (optional) — where-cluster bundle

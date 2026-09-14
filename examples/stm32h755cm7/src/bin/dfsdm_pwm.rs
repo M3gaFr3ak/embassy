@@ -199,7 +199,7 @@ async fn main(_spawner: Spawner) {
     const STATS_INTERVAL_US: u64 = 1_000_000; // report every 1s
 
     loop {
-        // ch_test.write_sample_standard(10);
+        // ch_test.write(10);
         if let Ok(ResultRegular { data, .. }) = flt0.regular.try_get_result() {
             let result_ready_at = Instant::now();
             let wait_dur = result_ready_at - wait_start;

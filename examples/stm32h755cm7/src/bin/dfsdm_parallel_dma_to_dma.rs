@@ -73,7 +73,7 @@ async fn main(_spawner: Spawner) {
 
     let ch_test = split
         .ch0
-        .build_parallel_dma(&common, dfsdm::config::DataPackingModeReduced::Standard)
+        .build_parallel_standard(&common)
         .set_data_right_shift(DataRightShift::new(0))
         .enable();
 

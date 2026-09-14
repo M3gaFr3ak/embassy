@@ -535,8 +535,15 @@ pub struct SpiExtMode;
 pub struct SpiCkoutMode;
 /// Manchester-coded input, clock recovered from the data line (SITP = 2/3).
 pub struct ManchesterMode;
-/// 16-bit parallel input from CPU/DMA writes (DATMPX = 2).
-pub struct ParallelDmaMode;
+/// 16-bit parallel input from CPU/DMA writes (DATMPX = 2), Standard packing
+/// (DATPACK = 0).
+pub struct ParallelStandard;
+/// 16-bit parallel input from CPU/DMA writes (DATMPX = 2), Interleaved packing
+/// (DATPACK = 1).
+pub struct ParallelInterleaved;
+/// 16-bit parallel input in a dual pair: the even channel uses Dual packing
+/// (DATPACK = 2), the odd channel is auto-fed from it.
+pub struct ParallelPaired;
 /// 16-bit parallel input from ADC writes (DATMPX = 1).
 pub struct ParallelAdcMode;
 
@@ -545,12 +552,16 @@ impl_sealed_and! {
     SpiExtMode,
     SpiCkoutMode,
     ManchesterMode,
-    ParallelDmaMode,
+    ParallelStandard,
+    ParallelInterleaved,
+    ParallelPaired,
     ParallelAdcMode,
 }
 
 /// Marker for modes that carry a serial stream a delay-block pulse skipper
-/// can act on. Not implemented for [`ParallelAdcMode`]/[`ParallelDmaMode`].
+/// can act on. Not implemented for the parallel-input modes
+/// ([`ParallelAdcMode`], [`ParallelStandard`], [`ParallelInterleaved`],
+/// [`ParallelPaired`]).
 pub trait SerialMode: ChannelMode {}
 
 /// Marker for serial modes relying on an external clock; gates
@@ -569,7 +580,8 @@ impl_trait! {
     ManchesterMode,
     SpiExtMode
 }
-// ParallelAdcMode, ParallelDmaMode deliberately excluded
+// ParallelAdcMode, ParallelStandard, ParallelInterleaved, ParallelPaired
+// deliberately excluded
 
 /// Which transceiver's serial pins this transceiver's interface consumes
 /// (CFGR1.CHINSEL). Pins are borrowed from that transceiver's slot, so

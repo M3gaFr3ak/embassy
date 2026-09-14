@@ -61,6 +61,27 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
 - [X] **`Error::InvalidConfig`** variant added for out-of-range config requests
   (used by the CKOUT helpers).
 
+- [X] **Parallel-input packing typestate.** Replaced the single `ParallelDmaMode`
+  marker with three single-semantics markers: `ParallelStandard` (DATPACK = 0,
+  `write(u16)`), `ParallelInterleaved` (DATPACK = 1, `write([u16; 2])`), and
+  `ParallelPaired` (dual pair, no direct write). Split `build_parallel_dma`
+  into `build_parallel_standard()` / `build_parallel_interleaved()`;
+  `build_parallel_dual()` returns `ParallelPairDisabled`. Removed the obsolete
+  `DataPackingModeReduced`.
+- [X] **`ParallelPairDisabled` / `ParallelPair`** — the dual pair is two structs
+  instead of a `PowerState`-generic one. `ParallelPairDisabled` (private fields)
+  carries consuming config aliases (`set_data_right_shift`,
+  `select_awd_filter_order`, `select_awd_filter_osr`, `set_offset`, each
+  `[X; 2]` with `[0]` = even / `[1]` = odd) and `enable()`. `ParallelPair`
+  (public `even`/`odd`) has `write`, `get_datinr_as_ptr`,
+  `set_offset(&mut self, [u32; 2])` and `disable()`.
+- [X] **`set_offset` builder split** — `&mut self` on `Enabled`, `self -> Self`
+  on `Disabled`, matching `set_data_right_shift`/`select_awd_filter_*`.
+- [X] **`dfsdm_parallel_dma_to_dma_dual.rs`** — made workable: dual pair, two
+  filters (flt0 on the even channel, flt1 on the odd), two ring buffers, an MDMA
+  mem2mem feed into `pair.get_datinr_as_ptr()`, reading both channels and
+  printing the amounts.
+
 ### DOCS
 
 - [x] **D1 — liveness contract** on `FilterRegular::read` (cross-refs on
@@ -553,7 +574,7 @@ Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.
   - `skip_progress() -> u8` — read PLSSKP; read-back = pulses *still to skip*,
     0 = done.
   - Gate `skip_pulses` to serial `ChannelMode`s (skipper acts on the serial
-    stream only; excludes ParallelAdcMode/ParallelDmaMode).
+    stream only; excludes the parallel-input modes).
   - Doc: write starts skipping immediately; updating mid-skip is allowed;
     ≤63 pulses per write, skip more by repeated writes; cumulative skipped
     count is the app's job. (Doc clauses ride T-doc.)

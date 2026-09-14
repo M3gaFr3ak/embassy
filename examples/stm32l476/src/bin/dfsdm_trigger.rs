@@ -52,10 +52,7 @@ async fn main(_spawner: Spawner) {
 
     // One parallel-DMA channel shared by all four filters (this test only
     // exercises the per-filter JEXTSEL mapping, not the datapath).
-    let channel = split
-        .ch0
-        .build_parallel_dma(&common, dfsdm::config::DataPackingModeReduced::Interleaved)
-        .enable();
+    let channel = split.ch0.build_parallel_interleaved(&common).enable();
 
     let filter_params = FilterParameters::try_new(FilterOrder::Sinc3 { fosr: 100 }, 50).unwrap();
 
