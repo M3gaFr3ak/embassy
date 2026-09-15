@@ -116,7 +116,7 @@ pub(crate) mod capability {
     /// Accepts a parallel ADC input path (DATMPX = 1).
     ///
     /// The ADC must also be configured to route its results to the DFSDM; use
-    /// [`crate::adc::Adc::start_dfsdm_continuous`].
+    /// [`crate::adc::Adc::start_dfsdm`].
     pub trait AdcInput {}
 
     /// Transceiver count of a shape.

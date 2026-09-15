@@ -5,7 +5,7 @@
 //! DFSDM channel 2 reads the results via the DATMPX=1 hardware path.
 //!
 //! The mapping is fixed: ADC[y+1] writes DFSDM_CHyDATINR, so ADC3 feeds channel
-//! 2. The ADC is started with `Adc::start_dfsdm_continuous`, which routes the
+//! 2. The ADC is started with `Adc::start_dfsdm`, which routes the
 //! results to the DFSDM (DMNGT/DFSDMCFG) and leaves them unread.
 
 use core::mem::MaybeUninit;
@@ -102,7 +102,7 @@ async fn main(_spawner: Spawner) {
 
     // Start the ADC converting continuously, routed to the DFSDM; each EOC
     // feeds one DFSDM sample.
-    adc.start_dfsdm_continuous(&mut vrefint, SampleTime::Cycles3875);
+    adc.start_dfsdm(&mut vrefint, SampleTime::Cycles3875, None);
 
     flt0.regular.start_conversion();
 

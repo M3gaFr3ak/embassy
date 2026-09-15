@@ -113,14 +113,15 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   `dfsdm_parallel_adc.rs` (ADC3 VREFINT -> DFSDM ch2 via `build_parallel_adc`,
   DATMPX=1) and `dfsdm_break.rs` (mic short-circuit -> DFSDM BKSCD -> TIM1 BRK1,
   break flag polled via `SR.BIF`, `ActiveHigh` polarity). Both on `stm32h755cm7`.
-- [X] **ADC DFSDM transfer mode** (`Adc::start_dfsdm_continuous` /
-  `stop_dfsdm_continuous`, gated `#[cfg(dfsdm_adc)]`). Added
-  `ConversionMode::Dfsdm` and a `dfsdm_adc` build cfg, emitted from `build.rs`
-  when a DFSDM block has the `_ADC` variant (mirrors `capability::AdcInput`).
-  `configure_dma` maps `Dfsdm` to `DMNGT=Dfsdm` on H7 (`adc_v3_h7`) and
-  `DFSDMCFG` on L4/L5 (`adc_v3_l4`); continuous, no DMA, results left unread
-  (the DFSDM transfer resets the ADC EOC). Referenced from
-  `build_parallel_adc` / `capability::AdcInput`; `dfsdm_parallel_adc.rs` uses it.
+- [X] **ADC DFSDM transfer mode** (`Adc::start_dfsdm` / `stop_dfsdm`, gated
+  `#[cfg(dfsdm_adc)]`). Added `ConversionMode::Dfsdm(Option<(u8, Exten)>)` and a
+  `dfsdm_adc` build cfg, emitted from `build.rs` when a DFSDM block has the
+  `_ADC` variant (mirrors `capability::AdcInput`). `configure_dma` maps `Dfsdm`
+  to `DMNGT=Dfsdm` on H7 (`adc_v3_h7`) and `DFSDMCFG` on L4/L5 (`adc_v3_l4`);
+  no DMA, results left unread (the DFSDM transfer resets the ADC EOC), and
+  `None`/`Some(trigger)` selects continuous vs trigger-driven conversion.
+  Referenced from `build_parallel_adc` / `capability::AdcInput`;
+  `dfsdm_parallel_adc.rs` uses it.
 
 ### DOCS
 

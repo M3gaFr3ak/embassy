@@ -506,7 +506,7 @@ where
     /// in this mode).
     ///
     /// The ADC must also be configured to route its results to the DFSDM; use
-    /// [`crate::adc::Adc::start_dfsdm_continuous`].
+    /// [`crate::adc::Adc::start_dfsdm`].
     pub fn build_parallel_adc<'a, 'd>(
         mut self,
         common: &'a DfsdmCommon<'d, T, Enabled>,

@@ -453,9 +453,10 @@ pub(crate) enum ConversionMode {
     /// DMA requests, sequences repeat: continuously when there is no trigger, or once per trigger
     /// event.
     Repeated(Option<(u8, Exten)>),
-    /// Continuous conversion routed to the DFSDM (no DMA, results left unread).
+    /// Conversion routed to the DFSDM (no DMA, results left unread): continuously when there is no
+    /// trigger, or once per trigger event.
     #[cfg(dfsdm_adc)]
-    Dfsdm,
+    Dfsdm(Option<(u8, Exten)>),
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -908,15 +909,20 @@ impl<'d, T: Instance, M: Mode> Adc<'d, T, M> {
         unsafe { core::ptr::read_volatile(r.data()) }
     }
 
-    /// Start continuously converting `channel` and route the results to the DFSDM.
+    /// Start converting `channel` and route the results to the DFSDM.
     ///
     /// Configures the ADC's DFSDM transfer (DMNGT/DFSDMCFG) so each conversion is
     /// written to the DFSDM parallel input (DATMPX=1); the results are left
-    /// unread. Continuous only: injected conversions do not feed the DFSDM, so
-    /// for a custom trigger, configure the regular external trigger in the ADC
-    /// registers directly. Stop with [`Self::stop_dfsdm_continuous`].
+    /// unread. `trigger` selects the conversion source: `None` converts
+    /// continuously, `Some(t)` converts once per trigger event. Injected
+    /// conversions do not feed the DFSDM. Stop with [`Self::stop_dfsdm`].
     #[cfg(dfsdm_adc)]
-    pub fn start_dfsdm_continuous<'a>(&mut self, channel: impl BorrowedChannel<'a, T>, sample_time: SampleTimeOf<T>) {
+    pub fn start_dfsdm<'a>(
+        &mut self,
+        channel: impl BorrowedChannel<'a, T>,
+        sample_time: SampleTimeOf<T>,
+        trigger: Option<RegularAdcTrigger<T>>,
+    ) {
         let channel = channel.reborrow_adc();
 
         let r = T::regs();
@@ -926,13 +932,13 @@ impl<'d, T: Instance, M: Mode> Adc<'d, T, M> {
             false,
         );
         r.enable();
-        r.configure_dma(ConversionMode::Dfsdm);
+        r.configure_dma(ConversionMode::Dfsdm(trigger.map(|t| (t.trigger, t.edge))));
         r.start();
     }
 
-    /// Stop a conversion started with [`Self::start_dfsdm_continuous`].
+    /// Stop a conversion started with [`Self::start_dfsdm`].
     #[cfg(dfsdm_adc)]
-    pub fn stop_dfsdm_continuous(&mut self) {
+    pub fn stop_dfsdm(&mut self) {
         let r = T::regs();
         r.stop();
         r.set_continuous(false);
