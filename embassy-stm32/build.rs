@@ -2278,6 +2278,7 @@ fn main() {
         }
     }
 
+    let mut has_dfsdm_adc = false;
     for (p, regs) in &peripheral_list {
         if (regs.kind == "dac" || regs.kind == "hash") && chip_name.starts_with("stm32c5") {
             continue;
@@ -2285,6 +2286,9 @@ fn main() {
 
         if regs.kind == "dfsdm" {
             g.extend(dfsdm_codegen::gen_instance(p.name, regs.block));
+            if dfsdm_codegen::parse(regs.block).map_or(false, |s| s.adc) {
+                has_dfsdm_adc = true;
+            }
         }
 
         for trigger in p.triggers {
@@ -2405,6 +2409,8 @@ fn main() {
             }
         }
     }
+
+    cfgs.set("dfsdm_adc", has_dfsdm_adc);
 
     // ========
     // Generate Triggers mod

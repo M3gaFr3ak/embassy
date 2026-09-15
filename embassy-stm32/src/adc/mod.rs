@@ -453,6 +453,9 @@ pub(crate) enum ConversionMode {
     /// DMA requests, sequences repeat: continuously when there is no trigger, or once per trigger
     /// event.
     Repeated(Option<(u8, Exten)>),
+    /// Continuous conversion routed to the DFSDM (no DMA, results left unread).
+    #[cfg(dfsdm_adc)]
+    Dfsdm,
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -903,6 +906,36 @@ impl<'d, T: Instance, M: Mode> Adc<'d, T, M> {
         while !r.done() {}
 
         unsafe { core::ptr::read_volatile(r.data()) }
+    }
+
+    /// Start continuously converting `channel` and route the results to the DFSDM.
+    ///
+    /// Configures the ADC's DFSDM transfer (DMNGT/DFSDMCFG) so each conversion is
+    /// written to the DFSDM parallel input (DATMPX=1); the results are left
+    /// unread. Continuous only: injected conversions do not feed the DFSDM, so
+    /// for a custom trigger, configure the regular external trigger in the ADC
+    /// registers directly. Stop with [`Self::stop_dfsdm_continuous`].
+    #[cfg(dfsdm_adc)]
+    pub fn start_dfsdm_continuous<'a>(&mut self, channel: impl BorrowedChannel<'a, T>, sample_time: SampleTimeOf<T>) {
+        let channel = channel.reborrow_adc();
+
+        let r = T::regs();
+        r.stop();
+        r.configure_sequence(
+            [((channel.channel(), channel.is_differential()), sample_time)].into_iter(),
+            false,
+        );
+        r.enable();
+        r.configure_dma(ConversionMode::Dfsdm);
+        r.start();
+    }
+
+    /// Stop a conversion started with [`Self::start_dfsdm_continuous`].
+    #[cfg(dfsdm_adc)]
+    pub fn stop_dfsdm_continuous(&mut self) {
+        let r = T::regs();
+        r.stop();
+        r.set_continuous(false);
     }
 
     /// Read one or multiple regular channels using DMA.

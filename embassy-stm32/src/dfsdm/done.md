@@ -109,6 +109,18 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   new `stm32h725` example (`dfsdm_polling.rs`) to the current API, and deleted
   the stale L4 compile-time-only test examples (`stm32l452/dfsdm_test.rs`,
   `stm32l476/dfsdm_trigger.rs`) together with their now-empty example crates.
+- [X] **Example pass (round 3): peripheral-to-peripheral.** Added
+  `dfsdm_parallel_adc.rs` (ADC3 VREFINT -> DFSDM ch2 via `build_parallel_adc`,
+  DATMPX=1) and `dfsdm_break.rs` (mic short-circuit -> DFSDM BKSCD -> TIM1 BRK1,
+  break flag polled via `SR.BIF`, `ActiveHigh` polarity). Both on `stm32h755cm7`.
+- [X] **ADC DFSDM transfer mode** (`Adc::start_dfsdm_continuous` /
+  `stop_dfsdm_continuous`, gated `#[cfg(dfsdm_adc)]`). Added
+  `ConversionMode::Dfsdm` and a `dfsdm_adc` build cfg, emitted from `build.rs`
+  when a DFSDM block has the `_ADC` variant (mirrors `capability::AdcInput`).
+  `configure_dma` maps `Dfsdm` to `DMNGT=Dfsdm` on H7 (`adc_v3_h7`) and
+  `DFSDMCFG` on L4/L5 (`adc_v3_l4`); continuous, no DMA, results left unread
+  (the DFSDM transfer resets the ADC EOC). Referenced from
+  `build_parallel_adc` / `capability::AdcInput`; `dfsdm_parallel_adc.rs` uses it.
 
 ### DOCS
 

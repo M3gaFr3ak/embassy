@@ -114,6 +114,9 @@ pub(crate) mod capability {
     pub trait HasHwid {}
 
     /// Accepts a parallel ADC input path (DATMPX = 1).
+    ///
+    /// The ADC must also be configured to route its results to the DFSDM; use
+    /// [`crate::adc::Adc::start_dfsdm_continuous`].
     pub trait AdcInput {}
 
     /// Transceiver count of a shape.
