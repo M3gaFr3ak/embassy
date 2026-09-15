@@ -417,6 +417,8 @@ impl<'d, T: AdvancedInstance4Channel> ComplementaryPwm<'d, T> {
     }
 
     /// Enable/disable routing DFSDM1_BREAK0 to this timer's break input.
+    ///
+    /// See `Timer::set_break_dfsdm_enable` for the part-availability caveat.
     #[cfg(all(dfsdm, any(timer_v1, timer_v3)))]
     pub fn set_break_dfsdm_enable(&mut self, enable: bool) {
         self.inner.set_break_dfsdm_enable(enable);
@@ -459,6 +461,8 @@ impl<'d, T: AdvancedInstance4Channel> ComplementaryPwm<'d, T> {
     }
 
     /// Enable/disable routing DFSDM1_BREAK1 to this timer's break input 2.
+    ///
+    /// See `Timer::set_break2_dfsdm_enable` for the part-availability caveat.
     #[cfg(all(dfsdm, any(timer_v1, timer_v3)))]
     pub fn set_break2_dfsdm_enable(&mut self, enable: bool) {
         self.inner.set_break2_dfsdm_enable(enable);

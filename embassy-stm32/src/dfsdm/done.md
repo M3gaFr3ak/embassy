@@ -103,6 +103,12 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   `dfsdm_pwm_injected_sc.rs` already used the explicit `start_conversion()` +
   `read()` pipeline and now behave correctly (the injected example also fixed a
   stray `regular` start that should have been `injected`).
+- [X] **Example pass (round 2).** `dfsdm_dma_to_dma.rs` now handles
+  `Err(Error::Overrun)` (retry loop) and demonstrates `blocking_read`;
+  `dfsdm_it.rs` reports read errors instead of silently dropping them. Ported a
+  new `stm32h725` example (`dfsdm_polling.rs`) to the current API, and deleted
+  the stale L4 compile-time-only test examples (`stm32l452/dfsdm_test.rs`,
+  `stm32l476/dfsdm_trigger.rs`) together with their now-empty example crates.
 
 ### DOCS
 
@@ -119,6 +125,45 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
   (interval between first and last sample, on fDFSDMCLK), not completed
   conversions; documented as not a reliable liveness signal (sub-Nyquist
   aliasing).
+- [x] **D2 — assign asymmetry** (`assign_transceiver`/`assign_transceivers`):
+  the regular channel select is shadowed until the next RSWSTART, while the
+  injected select (JCHGR) takes effect immediately and resets a running scan.
+- [x] **D3 — `start_*` semantics** (`start_conversion` ×2): requests are ignored
+  while RCIP/JCIP; an injected conversion preempts a running regular one
+  (restarted, flagged via `ResultRegular::pending`).
+- [x] **D4 — DATINR** (the three `write` methods): not buffered, so a sample
+  written before the conversion starts is lost.
+- [x] **D5 — CKOUT sequencing** (`CkoutDivider`): 0–20 MHz; stop CKOUT and wait
+  before changing the source (glitch); stop timing 4 sysclk / 1 sysclk + 3 audio.
+- [x] **D6 — RCONT restart quirk** (`set_continuous`): a CR1 write with RCONT=1
+  mid-conversion restarts the conversion.
+- [x] **D7 — disable semantics** (`DfsdmCommon::disable`): DFEN=0 stops
+  conversions and resets ISR + AWSR; RDATAR/JDATAR are not documented to be
+  cleared.
+- [x] **D9 — break cross-link** (`ShortCircuitDetector::assign_break_signals`,
+  AWD `assign_{high,low}_to_break_signals`): routes to the DFSDM break wire
+  (BKSCD/BKAWH/BKAWL); the receiving timer must separately map the wire to a
+  BRK input.
+- [x] **D10 — ignore-overrun on unchecked reads** (`get_result_unchecked` ×2):
+  does not check or clear the overrun flag; use `try_get_result`. Also fixed the
+  stale `Returns (data, channel, rpend)` tuple docs and the `rpend` → `pending`
+  field-name drift in `try_get_result`/`get_result_unchecked`.
+- [x] **D11 — ring constraints** (`RingBufferedFilter`): circular-only, one
+  ring (one DMA channel) per filter.
+- [x] **D12 — CKAB held-set** (`ClockAbsenceDetector::flags`): raw CKABF bits
+  are held set while a channel is disabled/unsynchronized, so they are masked
+  against the armed set.
+- [x] **D13 — extremes read-to-clear** (`read_maxima`/`read_minima`): reading
+  resets EXMAX/EXMIN and clears the channel field.
+- [x] **D14 — AWFSEL + AWFORD/AWFOSR** (`enable_analog_watchdog_fastmode`,
+  `select_awd_filter_{order,osr}`): AWFSEL is per-channel and only meaningful
+  in fast mode; the valid OSR range depends on the order.
+- [x] **FT5 break-caveat doc** (`timer/low_level.rs` + `complementary_pwm.rs`
+  cross-refs): `set_break_dfsdm_enable`/`set_break2_dfsdm_enable` target the
+  parts that implement the AF1/AF2 DFSDM break bit; the field may be named
+  differently per part (check the metapac), and where the TRM does not describe
+  the bit the DFSDM break wire is always connected (fires whenever break is
+  enabled). The DFSDM must also route its own break output (BKSCD/BKAWH/BKAWL).
 
 ### NITS
 4. [x] `Error` enum stray `//TODO` — resolved (no stray TODO remains; folded
@@ -142,7 +187,24 @@ Audited against: RM0455 ch.33 (H7A3/H7B3), RM0468 (H723+) break bits, metapac
 19. [x] (declined half) `#[diagnostic::on_unimplemented]` on the DMA-channel
     binding — declined: would require hand-writing the `Dma` trait or editing
     the shared `dma_trait!` macro (or a non-standard glue trait). The remaining
-    half (a dual-core `!Send` note) stays open in todo.
+    half (a dual-core `!Send` note) is now resolved as **no note**: embassy
+    peripherals are `Send` (`Peri` holds `PhantomData<&mut T>`), `critical_section`
+    is single-core interrupt protection (not cross-core), and cross-core safety
+    is architectural (single-owner `Peri` + `SharedData`/HSEM). A `!Send` note
+    would be unidiomatic — no driver documents single-core.
+11. [x] `new_pin!(...).unwrap()` ×3 (`transceiver.rs`) — safe (the macro always
+    returns `Some(Flex)`) and matches the `eth/sma` convention; `hspi` skips
+    the unwrap only because it stores `Option<Flex>`. No change.
+15. [x] `DFSDMEN` on `DfsdmCommon` — reflected: the `Enabled`/`Disabled`
+    typestate belongs there (it gates the filter/transceiver/pin consumers);
+    moving it to `Dfsdm` would split the enable state from its users. Leave.
+20. [x] `set_continuous` config/runtime split — idiomatic (enabling default in
+    `FilterConfig` + runtime `set_continuous`); RCONT is genuinely
+    runtime-writable. No change.
+22. [x] `select_awd_filter_*` voluntary vs mandatory — voluntary: AWD works
+    without the fast filter; AWFORD/AWFOSR are plain register values (no
+    undefined states), so the D14 note is the right remedy, not a typestate.
+FT19 — skipped (where-cluster bundle; left as-is by repeated decision).
 
 ### DATA PIPELINE — stm32-data side
 Full detail lives in the stm32-data repo: `in_progress/DFSDMx/TODO.md`.

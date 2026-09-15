@@ -13,7 +13,7 @@ use defmt::*;
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_stm32::dfsdm::config::{DataRightShift, FilterOrder, FilterParameters};
-use embassy_stm32::dfsdm::{FilterConfig, Flt0, ResultRegular};
+use embassy_stm32::dfsdm::{Error, FilterConfig, Flt0, ResultRegular};
 use embassy_stm32::dma::{self, Channel, TransferOptions};
 use embassy_stm32::peripherals::{self, DFSDM1};
 use embassy_stm32::{SharedData, bind_interrupts, dfsdm};
@@ -123,8 +123,17 @@ async fn main(_spawner: Spawner) {
     });
 
     // Comparison.
+    // `blocking_read` spins until data is ready; the async `read` is the twin
+    // with the same half-capacity contract. Both return `Err(Error::Overrun)`
+    // when the DMA overran, which resets the ring and drops samples.
     let mut result = [0u32; N_OUT];
-    ring.read(&mut result).await.unwrap();
+    loop {
+        match ring.blocking_read(&mut result) {
+            Ok(_) => break,
+            Err(Error::Overrun) => warn!("ring buffer overrun, retrying"),
+            Err(_) => warn!("ring error, retrying"),
+        }
+    }
 
     let mut all_ok = true;
     for k in 0..N_OUT {

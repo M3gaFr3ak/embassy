@@ -1549,6 +1549,15 @@ impl<'d, T: AdvancedInstance1Channel> Timer<'d, T> {
     }
 
     /// Enable/disable routing DFSDM1_BREAK0 to this timer's break input.
+    ///
+    /// # Note
+    /// This method targets the parts that implement the AF1 DFSDM break bit;
+    /// the field may be named differently on some parts (check the metapac).
+    /// On parts where the TRM does not describe the bit, the DFSDM break wire
+    /// is always connected to this break input, so a DFSDM break event triggers
+    /// it whenever break is enabled. The DFSDM must also route its own break
+    /// output (`BKSCD` for short-circuit, `BKAWH`/`BKAWL` for the analog
+    /// watchdog).
     #[cfg(all(dfsdm, any(timer_v1, timer_v3)))]
     pub fn set_break_dfsdm_enable(&self, enable: bool) {
         self.regs_1ch_cmp().af1().modify(|w| w.set_bkdf1bke(enable));
@@ -1755,6 +1764,15 @@ impl<'d, T: AdvancedInstance4Channel> Timer<'d, T> {
     }
 
     /// Enable/disable routing DFSDM1_BREAK1 to this timer's break input 2.
+    ///
+    /// # Note
+    /// This method targets the parts that implement the AF2 DFSDM break bit;
+    /// the field may be named differently on some parts (check the metapac).
+    /// On parts where the TRM does not describe the bit, the DFSDM break wire
+    /// is always connected to this break input, so a DFSDM break event triggers
+    /// it whenever break is enabled. The DFSDM must also route its own break
+    /// output (`BKSCD` for short-circuit, `BKAWH`/`BKAWL` for the analog
+    /// watchdog).
     #[cfg(all(dfsdm, any(timer_v1, timer_v3)))]
     pub fn set_break2_dfsdm_enable(&self, enable: bool) {
         self.regs_advanced().af2().modify(|w| w.set_bk2df1bk1e(enable));
