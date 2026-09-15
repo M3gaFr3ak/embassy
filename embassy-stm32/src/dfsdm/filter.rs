@@ -466,6 +466,11 @@ where
     /// Use [`Filter::replace_regular_transceiver`] if you need to assign a
     /// transceiver with a shorter/different lifetime and get the old one back
     /// for further mutation.
+    ///
+    /// # Note
+    /// The regular channel select is shadowed: it takes effect only at the next
+    /// [`start_conversion`](Self::start_conversion) (RSWSTART), so an in-progress
+    /// conversion keeps using the previously selected channel.
     pub fn assign_transceiver(&mut self, transceiver: &'t dyn TransceiverTrait<T, Enabled>) {
         Self::set_transceiver(transceiver.index());
         self.regular = transceiver;
@@ -476,6 +481,11 @@ where
     }
 
     /// Start a regular conversion.
+    ///
+    /// # Note
+    /// The request is ignored while a regular conversion is in progress (RCIP).
+    /// An injected conversion preempts a running regular conversion, which is
+    /// restarted and flagged via [`ResultRegular::pending`].
     pub fn start_conversion(&mut self) {
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_rswstart(true));
     }
@@ -529,14 +539,14 @@ where
 
     /// Attempts to read the current regular conversion result.
     ///
-    /// Returns Ok((data, channel, rpend)) if REOCF is set,
-    /// Err(Error::Overrun) if an overrun occurred, or
-    /// Err(Error::NotReady) if no conversion result is available.
+    /// Returns [`ResultRegular`] if `REOCF` is set, [`Error::Overrun`] if an
+    /// overrun occurred, or [`Error::NotReady`] if no conversion result is
+    /// available.
     ///
     /// The conversion result is sign-extended from 24 to 32 bits and is not scaled.
     ///
-    /// `rpend` is set if the regular conversion was delayed by an injected
-    /// conversion.
+    /// [`ResultRegular::pending`] is set if the regular conversion was delayed
+    /// by an injected conversion.
     ///
     /// Reading the result clears the corresponding data register.
     pub fn try_get_result(&mut self) -> Result<ResultRegular, Error> {
@@ -553,12 +563,14 @@ where
     ///
     /// The conversion result is sign-extended from 24 to 32 bits and is not scaled.
     ///
-    /// `rpend` is set if the regular conversion was delayed by an injected
-    /// conversion.
+    /// [`ResultRegular::pending`] is set if the regular conversion was delayed
+    /// by an injected conversion.
     ///
     /// The returned data is only valid if `REOCF` was set before reading.
     ///
-    /// Returns `(data, channel, rpend)`.
+    /// # Note
+    /// This path does not check or clear the overrun flag; use
+    /// [`try_get_result`](Self::try_get_result) to propagate overruns.
     pub fn get_result_unchecked(&mut self) -> ResultRegular {
         let word = T::regs().flt(M::CHANNEL.index()).rdatar().read().0;
         ResultRegular::from_word(word)
@@ -589,6 +601,10 @@ where
     /// When enabled, the regular transceiver is converted repeatedly after each
     /// conversion request. Disabling it while a continuous conversion is in
     /// progress stops the conversion immediately.
+    ///
+    /// # Note
+    /// Writing CR1 while continuous mode is enabled (RCONT=1) mid-conversion
+    /// restarts the conversion.
     pub fn set_continuous(&mut self, enabled: bool) {
         FilterDisabled::<T, M>::set_continuous(enabled);
     }
@@ -643,6 +659,10 @@ where
     /// Use [`Filter::replace_injected_transceivers`] if you need to assign a
     /// transceiver with a shorter/different lifetime and get the old one back
     /// for further mutation.
+    ///
+    /// # Note
+    /// Unlike the regular channel select, the injected select (JCHGR) takes
+    /// effect immediately and resets any injected scan in progress.
     pub fn assign_transceivers<const N: usize>(&mut self, transceivers: [&'t dyn TransceiverTrait<T, Enabled>; N])
     where
         [(); N]: NonEmpty,
@@ -678,6 +698,11 @@ where
     }
 
     /// Start an injected conversion.
+    ///
+    /// # Note
+    /// The request is ignored while an injected conversion is in progress
+    /// (JCIP). An injected conversion preempts a running regular conversion
+    /// (flagged via [`ResultRegular::pending`]).
     pub fn start_conversion(&mut self) {
         T::regs().flt(M::CHANNEL.index()).cr1().modify(|w| w.set_jswstart(true));
     }
@@ -725,8 +750,9 @@ where
 
     /// Attempts to read the current injected conversion result.
     ///
-    /// Returns Ok((data, channel)) if JEOCF is set, Err(Error::Overrun)
-    /// if an overrun occurred, or Err(Error::NotReady) if no conversion result is available.
+    /// Returns [`ResultInjected`] if `JEOCF` is set, [`Error::Overrun`] if an
+    /// overrun occurred, or [`Error::NotReady`] if no conversion result is
+    /// available.
     ///
     /// The conversion result is sign-extended from 24 to 32 bits and is not scaled.
     ///
@@ -747,7 +773,9 @@ where
     ///
     /// The returned data is only valid if `JEOCF` was set before reading.
     ///
-    /// Returns `(data, channel)`.
+    /// # Note
+    /// This path does not check or clear the overrun flag; use
+    /// [`try_get_result`](Self::try_get_result) to propagate overruns.
     pub fn get_result_unchecked(&mut self) -> ResultInjected {
         let word = T::regs().flt(M::CHANNEL.index()).jdatar().read().0;
         ResultInjected::from_word(word)

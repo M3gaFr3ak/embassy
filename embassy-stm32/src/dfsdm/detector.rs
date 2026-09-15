@@ -169,6 +169,10 @@ where
     }
 
     /// Assign break signals to fire on the high threshold.
+    ///
+    /// # Note
+    /// This routes a watchdog event to a DFSDM break wire (BKAWH); the
+    /// receiving timer must separately map that wire to a break input (BRK).
     pub fn assign_high_to_break_signals(&mut self, break_signals: config::BreakSignals) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -177,6 +181,10 @@ where
     }
 
     /// Assign break signals to fire on the low threshold.
+    ///
+    /// # Note
+    /// This routes a watchdog event to a DFSDM break wire (BKAWL); the
+    /// receiving timer must separately map that wire to a break input (BRK).
     pub fn assign_low_to_break_signals(&mut self, break_signals: config::BreakSignals) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -185,6 +193,11 @@ where
     }
 
     /// Enable or disable the watchdog filter as the comparison source (AWFSEL).
+    ///
+    /// # Note
+    /// AWFSEL is per-channel and only meaningful in fast mode, where the
+    /// watchdog compares against its own fast filter instead of the main filter
+    /// output.
     pub fn enable_analog_watchdog_fastmode(&mut self, enabled: bool) {
         T::regs()
             .flt(M::CHANNEL.index())
@@ -339,7 +352,8 @@ where
     }
 
     /// Reads the extremes detector maximum value and its corresponding channel.
-    /// Reading this resets the register value to `0x800000`.
+    /// Reading this resets the register value to `0x800000` and clears the
+    /// channel field.
     pub fn read_maxima(&mut self) -> ResultExtreme {
         let exmax = T::regs().flt(M::CHANNEL.index()).exmax().read();
         ResultExtreme {
@@ -349,7 +363,8 @@ where
     }
 
     /// Reads the extremes detector minimum value and its corresponding channel.
-    /// Reading this resets the register value to `0x7FFFFF`.
+    /// Reading this resets the register value to `0x7FFFFF` and clears the
+    /// channel field.
     pub fn read_minima(&mut self) -> ResultExtreme {
         let exmin = T::regs().flt(M::CHANNEL.index()).exmin().read();
         ResultExtreme {
@@ -465,6 +480,10 @@ where
     }
 
     /// Assign break-signals for short-circuit-event of transceiver
+    ///
+    /// # Note
+    /// This routes a short-circuit event to a DFSDM break wire (BKSCD); the
+    /// receiving timer must separately map that wire to a break input (BRK).
     pub fn assign_break_signals(
         &mut self,
         transceiver: &dyn TransceiverTrait<T, Enabled>,
@@ -625,6 +644,12 @@ where
     }
 
     /// Clock-absence flag bitmap.
+    ///
+    /// # Note
+    /// The raw CKABF bits are held set while a channel is disabled or not yet
+    /// synchronized, so they are masked here against the armed channel set.
+    /// Call [`clear_flags`](Self::clear_flags) after assigning transceivers to
+    /// drop startup residue.
     pub fn flags(&self) -> u8 {
         Self::channel_flags_masked()
     }

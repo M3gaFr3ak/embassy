@@ -29,6 +29,11 @@ impl From<CkoutSource> for bool {
 /// CKOUT divider register value.
 ///
 /// 0 = CKOUT stopped; 1..=255 = enabled (actual divider = value + 1, range 2..=256).
+///
+/// The CKOUT output runs at 0 to 20 MHz. Stop CKOUT (divider 0) and wait for
+/// the clock to settle before changing the CKOUT source, or the output can
+/// glitch. Stopping takes 4 system-clock cycles for the system source, or
+/// 1 system clock plus 3 audio-clock cycles for the audio source.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct CkoutDivider(u8);
 

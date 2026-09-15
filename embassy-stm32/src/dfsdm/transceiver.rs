@@ -193,6 +193,10 @@ where
     }
 
     /// Set the analog watchdog filter's order.
+    ///
+    /// # Note
+    /// The valid watchdog OSR range depends on this order; set
+    /// [`select_awd_filter_osr`](Self::select_awd_filter_osr) accordingly.
     pub fn select_awd_filter_order(self, filter_order: config::AwdFilterOrder) -> Self {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -202,6 +206,10 @@ where
     }
 
     /// Set the analog watchdog filter's OSR.
+    ///
+    /// # Note
+    /// The valid OSR range depends on the order set via
+    /// [`select_awd_filter_order`](Self::select_awd_filter_order).
     pub fn select_awd_filter_osr(self, osr: config::AwdFilterOsr) -> Self {
         T::regs()
             .ch(M::CHANNEL.index())
@@ -240,6 +248,10 @@ where
     ///
     /// Loads `data` into `INDAT0[15:0]`; the upper `INDAT1[15:0]` field is
     /// ignored and write-protected in this mode. One 16-bit sample per write.
+    ///
+    /// # Note
+    /// DATINR is not buffered: a sample written before the conversion starts is
+    /// lost, so data must be present when the filter latches it.
     pub fn write(&self, data: u16) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| w.set_indat0(data));
     }
@@ -266,6 +278,10 @@ where
     /// Loads `data[0]` into `INDAT0[15:0]` and `data[1]` into `INDAT1[15:0]`;
     /// both are read sequentially by the same filter on channel `y`. Two 16-bit
     /// samples per 32-bit write.
+    ///
+    /// # Note
+    /// DATINR is not buffered: samples written before the conversion starts are
+    /// lost, so data must be present when the filter latches it.
     pub fn write(&self, data: [u16; 2]) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| {
             w.set_indat0(data[0]);
@@ -424,6 +440,10 @@ where
     /// Write two samples: `data[0]` to channel `y` (INDAT0) and `data[1]` to
     /// channel `y + 1` (INDAT1, copied by the hardware into the odd channel's
     /// INDAT0).
+    ///
+    /// # Note
+    /// DATINR is not buffered: samples written before the conversion starts are
+    /// lost, so data must be present when the filter latches it.
     pub fn write(&self, data: [u16; 2]) {
         T::regs().ch(M::CHANNEL.index()).datinr().write(|w| {
             w.set_indat0(data[0]);

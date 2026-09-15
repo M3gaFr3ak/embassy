@@ -341,6 +341,10 @@ where
     T: Instance,
 {
     /// Disables the peripheral.
+    ///
+    /// Setting DFEN=0 stops any conversion in progress and resets the status
+    /// registers (ISR) and the analog-watchdog status register (AWSR). The data
+    /// registers (RDATAR/JDATAR) are not documented to be cleared.
     pub fn disable(self) -> DfsdmCommon<'d, T, Disabled> {
         T::regs().ch(0).cfgr1().modify(|w| w.set_dfsdmen(false));
 

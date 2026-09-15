@@ -22,6 +22,10 @@ use crate::rcc::WakeGuard;
 /// Decode each word with [`ResultRegular::from_word`] or
 /// [`ResultInjected::from_word`]; use [`FilterRegular::read`] for
 /// already-decoded, sign-extended results.
+///
+/// # Note
+/// The ring buffer is circular: it wraps and overwrites the oldest samples. A
+/// filter can have only one ring buffer (one DMA channel) attached at a time.
 pub struct RingBufferedFilter<'e, T, M, DM: DmaMode>
 where
     T: Instance + FilterInterrupt<M>,
