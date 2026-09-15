@@ -30,7 +30,6 @@ pub use transceiver::*;
 pub use types::*;
 
 pub use crate::_generated::dfsdm::*;
-
 use crate::dfsdm::capability::HasDelay;
 use crate::dfsdm::config::{BreakSignals, FilterParameters};
 use crate::gpio::{AfType, Flex, OutputType, Pull, Speed};
@@ -366,7 +365,7 @@ where
     /// order.
     ///
     /// // DFSDM instance with 8-transceiver capability:
-    /// ```
+    /// ```rust,ignore
     /// dfsdm1.configure_pins(|tb| {
     ///     (
     ///         tb.ch0.datin_ckin(p.PC1, p.PC0),
@@ -382,7 +381,7 @@ where
     /// ```
     ///
     /// // DFSDM instance with 2-transceiver capability:
-    /// ```
+    /// ```rust,ignore
     /// dfsdm1.configure_pins(|tb| {
     ///     (
     ///         tb.ch0.datin_ckin(p.PC1, p.PC0),
