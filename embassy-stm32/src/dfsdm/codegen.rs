@@ -223,6 +223,7 @@ pub fn gen_shapes() -> TokenStream {
     let tuples = [2u8, 4, 8].map(gen_tuple);
 
     quote! {
+        #[cfg(dfsdm)]
         pub mod dfsdm {
             #(#splits)*
             #(#selectors)*
